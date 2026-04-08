@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瞑想習慣 - Meditation Habit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            margin: 0;
+            overflow-y: auto;
+        }
+
+        #breath-bg {
+            transition: transform 1s ease-in-out, background-color 1s;
+            transform: scale(1);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.03);
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .modal {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #finish-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            justify-content: flex-start;
+            align-items: center;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 40px 20px;
+        }
+
+        #preview-image {
+            max-width: 100%;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 999px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 200;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="py-6 px-4">
+
+    <!-- ヘッダー -->
+    <div class="w-full max-w-md mx-auto flex justify-between items-start mb-0 z-10 transition-opacity duration-500" id="header-icons">
+        <div class="flex gap-2">
+            <button id="btn-info" class="p-3 rounded-full bg-white/60 hover:bg-white transition-colors shadow-sm text-gray-600">
+                <i class="ph ph-info text-2xl"></i>
+            </button>
+            <button id="btn-settings" class="p-3 rounded-full bg-white/60 hover:bg-white transition-colors shadow-sm text-gray-600">
+                <i class="ph ph-sliders-horizontal text-2xl"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- メイン -->
+    <main class="flex-grow flex flex-col items-center justify-center max-w-md mx-auto w-full py-2">
+        <div id="breath-trigger" class="relative flex items-center justify-center w-72 h-72 md:w-96 md:h-96 cursor-pointer group mb-2">
+            <div id="breath-bg" class="absolute w-full h-full rounded-full bg-white border border-gray-100"></div>
+            <div class="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none text-center">
+                <span id="phase-text" class="text-2xl md:text-3xl font-light tracking-widest text-gray-800"></span>
+                <div id="timer-display" class="text-2xl md:text-3xl font-extralight text-gray-400 font-mono absolute bottom-20 md:bottom-28">02:00</div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <div id="custom-message-display" class="text-3xl md:text-4xl font-light text-gray-800 tracking-wide"></div>
+        </div>
+    </main>
+
+    <!-- 終了時オーバーレイ -->
+    <div id="finish-overlay">
+        <div class="w-full max-w-sm text-center">
+            <h2 id="finish-title" class="text-2xl font-bold mb-4 text-gray-800 tracking-tight"></h2>
+            
+            <div class="mb-4">
+                <img id="preview-image" src="" alt="Share Card">
+            </div>
+
+            <button id="btn-copy-image" class="mb-6 mx-auto py-2 px-6 bg-gray-100 text-gray-700 rounded-full text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-200 shadow-sm transition active:scale-95 border border-gray-200">
+                <i class="ph ph-copy text-lg"></i>
+                <span id="lbl-copy"></span>
+            </button>
+
+            <div class="space-y-4 w-full">
+                <button id="btn-post-x" class="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg transition active:scale-95 bg-black text-white">
+                    <i class="ph ph-x-logo text-xl"></i>
+                    <span id="lbl-post"></span>
+                </button>
+                <button id="btn-reset" class="w-full bg-gray-100 text-gray-500 py-3 rounded-2xl font-medium transition active:scale-95"></button>
+            </div>
+            
+            <div id="share-note" class="mt-6 text-xs text-gray-400 leading-relaxed px-4"></div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+    <canvas id="share-canvas" width="1200" height="630" style="display:none;"></canvas>
+
+    <!-- 設定モーダル -->
+    <div id="modal-settings" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/20 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-8 max-h-[95vh] overflow-y-auto shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="modal-settings-title" class="text-2xl font-medium text-gray-800"></h2>
+                <button class="close-modal p-2 text-gray-500 hover:text-gray-800"><i class="ph ph-x text-2xl"></i></button>
+            </div>
+            <div class="space-y-6">
+                <!-- 言語設定 -->
+                <div>
+                    <label id="lbl-lang-setting" class="block text-xs text-gray-500 mb-2 font-bold"></label>
+                    <select id="input-lang" class="w-full bg-white border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-200">
+                        <option value="auto">Auto (Detect)</option>
+                        <option value="ja">日本語</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+
+                <!-- 振動設定 -->
+                <div class="flex items-center justify-between p-1">
+                    <label id="lbl-vibrate-setting" class="text-xs text-gray-500 font-bold"></label>
+                    <button id="toggle-vibrate" class="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 transition-colors focus:outline-none">
+                        <span id="vibrate-knob" class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1"></span>
+                    </button>
+                </div>
+
+                <div class="border-t border-gray-100 pt-4">
+                    <label id="lbl-total-time" class="block text-xs text-gray-500 mb-2"></label>
+                    <input type="number" id="input-total-time" value="2" class="w-full bg-white border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-200">
+                </div>
+                
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label id="lbl-exhale" class="block text-[10px] text-gray-500 mb-1 text-center"></label>
+                        <input type="number" id="input-exhale" value="15" class="w-full border rounded-xl p-3 text-center outline-none focus:ring-2 focus:ring-blue-200">
+                    </div>
+                    <div>
+                        <label id="lbl-inhale" class="block text-[10px] text-gray-500 mb-1 text-center"></label>
+                        <input type="number" id="input-inhale" value="3" class="w-full border rounded-xl p-3 text-center outline-none focus:ring-2 focus:ring-blue-200">
+                    </div>
+                    <div>
+                        <label id="lbl-hold" class="block text-[10px] text-gray-500 mb-1 text-center"></label>
+                        <input type="number" id="input-hold" value="2" class="w-full border rounded-xl p-3 text-center outline-none focus:ring-2 focus:ring-blue-200">
+                    </div>
+                </div>
+
+                <div>
+                    <label id="lbl-message-setting" class="block text-xs text-gray-500 mb-2"></label>
+                    <input type="text" id="input-message" maxlength="20" class="w-full bg-white border border-gray-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-200">
+                </div>
+            </div>
+            <button id="btn-save-settings" class="w-full mt-8 bg-gray-800 text-white py-4 rounded-2xl font-bold shadow-lg transition active:scale-95"></button>
+        </div>
+    </div>
+
+    <!-- 情報モーダル -->
+    <div id="modal-info" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/20 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-lg rounded-3xl p-8 max-h-[85vh] overflow-y-auto shadow-xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="modal-info-title" class="text-xl font-bold text-gray-800 tracking-tight"></h2>
+                <button class="close-modal p-2 text-gray-400 hover:text-gray-800"><i class="ph ph-x text-2xl"></i></button>
+            </div>
+            <div class="space-y-8 text-gray-700 leading-relaxed font-light">
+                <section>
+                    <h3 id="info-q1" class="font-bold text-gray-900 mb-3 border-b border-gray-100 pb-2"></h3>
+                    <p id="info-a1" class="text-sm"></p>
+                    <p id="info-ref1" class="text-[10px] text-gray-400 mt-2 italic text-right"></p>
+                </section>
+                <section>
+                    <h3 id="info-q2" class="font-bold text-gray-900 mb-3 border-b border-gray-100 pb-2"></h3>
+                    <div class="text-sm space-y-3">
+                        <p id="info-a2-1" class="text-gray-900 font-medium italic"></p>
+                        <p id="info-a2-2"></p>
+                        <p id="info-a2-3"></p>
+                    </div>
+                    <p id="info-ref2" class="text-[10px] text-gray-400 mt-4 italic text-right"></p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 辞書データ ---
+        const translations = {
+            ja: {
+                appTitle: "瞑想習慣",
+                start: "はじめる",
+                inhale: "吸う",
+                hold: "ためる",
+                exhale: "息をはく",
+                defaultMsg: "考えない",
+                finished: "瞑想を完了しました",
+                copyBtn: "画像をコピーする",
+                postBtn: "Xに投稿する",
+                resetBtn: "完了して戻る",
+                toastCopyOk: "画像をコピーしました！下のボタンからXへ進んでください。",
+                toastCopyNg: "お使いの環境はコピー非対応です。画像を長押しして保存してください。",
+                toastPreview: "プレビュー環境のためコピーが制限されました。代わりに画像を保存します。",
+                shareNote: "※「画像をコピーする」を押した後、「Xに投稿する」を押し、Xの画面で画像を貼り付けてください。",
+                infoTitle: "呼吸のメソッド",
+                infoQ1: "なぜ「吐く」から始まるのか？",
+                infoA1: "肺の中の古い空気をすべて出し切ることで、自然と新鮮な空気が入ってくるスペースが生まれます。「手放すことが先」という教えです。",
+                infoRef1: "参照：『新版 呼吸の本』 加藤 俊朗・谷川 俊太郎",
+                infoQ2: "3：2：15のリズムについて",
+                infoA2_1: "3秒吸って、2秒溜めて、15秒で吐く－これで、からだの力が劇的に高まる",
+                infoA2_2: "現代人は呼吸が浅くはやくなっている。深い呼吸の力を取り戻す時、からだは疲れにくく集中力は飛躍的に向上する。",
+                infoA2_3: "そして心に中心軸が生まれる－かつて日本人が持っていた「呼吸力」を取り戻す。",
+                infoRef2: "参照：『呼吸入門』 齋藤 孝 (角川書店)",
+                settingTitle: "設定",
+                lblLang: "表示言語 (Language)",
+                lblVibrate: "振動で切り替えを知らせる (Androidのみ)",
+                lblTotalTime: "全体の瞑想時間 (分)",
+                lblExhale: "吐く(秒)",
+                lblInhale: "吸う(秒)",
+                lblHold: "ためる(秒)",
+                lblMessage: "表示メッセージ (自由に変更できます)",
+                btnSaveSettings: "設定を保存",
+                timeMorning: "朝",
+                timeNoon: "昼",
+                timeEvening: "夕方",
+                timeNight: "夜",
+                shareCanvasTitle: "瞑想習慣",
+                shareCanvasMin: "minutes",
+                shareCanvasSub: "心を整え、自分に戻る時間。",
+                shareCanvasApp: "Meditation Habit App",
+                xShareText: "分間の瞑想を完了しました。心を整えて、リラックス。集中。\n\n#瞑想 #瞑想習慣\n"
+            },
+            en: {
+                appTitle: "Meditation Habit",
+                start: "Start",
+                inhale: "Inhale",
+                hold: "Hold",
+                exhale: "Exhale",
+                defaultMsg: "Clear your mind",
+                finished: "Meditation Completed",
+                copyBtn: "Copy Image",
+                postBtn: "Post on X",
+                resetBtn: "Done",
+                toastCopyOk: "Image copied! Click 'Post on X' below.",
+                toastCopyNg: "Copy not supported. Long press image to save.",
+                toastPreview: "Copy restricted. Image saved instead.",
+                shareNote: "* Click 'Copy Image', then click 'Post on X' and paste the image in your post.",
+                infoTitle: "Breathing Method",
+                infoQ1: "Why start with an exhale?",
+                infoA1: "By emptying old air from your lungs, space is naturally created for fresh air to enter. It teaches us to 'let go first'.",
+                infoRef1: "Ref: 'The Book of Breath' by T. Kato & S. Tanikawa",
+                infoQ2: "The 3:2:15 Rhythm",
+                infoA2_1: "Inhale for 3s, hold for 2s, exhale for 15s - dramatically enhances your body's energy.",
+                infoA2_2: "Modern breathing is shallow and fast. Restoring deep breathing reduces fatigue and boosts focus.",
+                infoA2_3: "It creates a central axis in your mind, reclaiming inner strength.",
+                infoRef2: "Ref: 'Introduction to Breathing' by T. Saito",
+                settingTitle: "Settings",
+                lblLang: "Language",
+                lblVibrate: "Vibrate on transition (Android only)",
+                lblTotalTime: "Total Time (min)",
+                lblExhale: "Exhale (sec)",
+                lblInhale: "Inhale (sec)",
+                lblHold: "Hold (sec)",
+                lblMessage: "Display Message (Customizable)",
+                btnSaveSettings: "Save Settings",
+                timeMorning: "Morning",
+                timeNoon: "Afternoon",
+                timeEvening: "Evening",
+                timeNight: "Night",
+                shareCanvasTitle: "Meditation Habit",
+                shareCanvasMin: "minutes",
+                shareCanvasSub: "Time to reset and reconnect.",
+                shareCanvasApp: "Meditation Habit App",
+                xShareText: " minutes of meditation completed. Mind cleared and ready.\n\n#Meditation #MeditationHabit\n"
+            }
+        };
+
+        // 状態管理
+        let settings = { 
+            totalMinutes: 2, 
+            exhaleTime: 15, 
+            inhaleTime: 3, 
+            holdTime: 2, 
+            message: "考えない",
+            lang: 'auto',
+            vibrate: true
+        };
+
+        const detectLang = () => {
+            if (settings.lang === 'ja') return 'ja';
+            if (settings.lang === 'en') return 'en';
+            const userLang = navigator.language || navigator.userLanguage;
+            return userLang.startsWith('ja') ? 'ja' : 'en';
+        };
+
+        let isMeditating = false;
+        let mainTimerInterval = null;
+        let breathTimeout = null;
+        let remainingTime = 120;
+
+        // DOM要素
+        const breathTrigger = document.getElementById('breath-trigger');
+        const breathBg = document.getElementById('breath-bg');
+        const timerDisplay = document.getElementById('timer-display');
+        const customMessageDisplay = document.getElementById('custom-message-display');
+        const phaseText = document.getElementById('phase-text');
+        const modalSettings = document.getElementById('modal-settings');
+        const modalInfo = document.getElementById('modal-info');
+        const finishOverlay = document.getElementById('finish-overlay');
+        const shareCanvas = document.getElementById('share-canvas');
+        const previewImage = document.getElementById('preview-image');
+        const toast = document.getElementById('toast');
+        const headerIcons = document.getElementById('header-icons');
+        const vibrateBtn = document.getElementById('toggle-vibrate');
+        const vibrateKnob = document.getElementById('vibrate-knob');
+
+        // テキストの適用
+        function applyTranslations() {
+            const currentLang = detectLang();
+            const t = translations[currentLang];
+            const otherLang = currentLang === 'ja' ? 'en' : 'ja';
+            const otherT = translations[otherLang];
+            
+            if (settings.message === otherT.defaultMsg) {
+                settings.message = t.defaultMsg;
+                document.getElementById('input-message').value = t.defaultMsg;
+            }
+
+            document.title = t.appTitle;
+            if (!isMeditating) phaseText.innerText = t.start;
+            
+            document.getElementById('finish-title').innerText = t.finished;
+            document.getElementById('lbl-copy').innerText = t.copyBtn;
+            document.getElementById('lbl-post').innerText = t.postBtn;
+            document.getElementById('btn-reset').innerText = t.resetBtn;
+            document.getElementById('share-note').innerText = t.shareNote;
+            
+            document.getElementById('modal-info-title').innerText = t.infoTitle;
+            document.getElementById('info-q1').innerText = t.infoQ1;
+            document.getElementById('info-a1').innerText = t.infoA1;
+            document.getElementById('info-ref1').innerText = t.infoRef1;
+            document.getElementById('info-q2').innerText = t.infoQ2;
+            document.getElementById('info-a2-1').innerText = t.infoA2_1;
+            document.getElementById('info-a2-2').innerText = t.infoA2_2;
+            document.getElementById('info-a2-3').innerText = t.infoA2_3;
+            document.getElementById('info-ref2').innerText = t.infoRef2;
+            
+            document.getElementById('modal-settings-title').innerText = t.settingTitle;
+            document.getElementById('lbl-lang-setting').innerText = t.lblLang;
+            document.getElementById('lbl-vibrate-setting').innerText = t.lblVibrate;
+            document.getElementById('lbl-total-time').innerText = t.lblTotalTime;
+            document.getElementById('lbl-exhale').innerText = t.lblExhale;
+            document.getElementById('lbl-inhale').innerText = t.lblInhale;
+            document.getElementById('lbl-hold').innerText = t.lblHold;
+            document.getElementById('lbl-message-setting').innerText = t.lblMessage;
+            document.getElementById('btn-save-settings').innerText = t.btnSaveSettings;
+            
+            customMessageDisplay.innerText = settings.message;
+            updateVibrateUI();
+        }
+
+        function updateVibrateUI() {
+            if (settings.vibrate) {
+                vibrateBtn.classList.remove('bg-gray-200');
+                vibrateBtn.classList.add('bg-blue-500');
+                vibrateKnob.style.transform = 'translateX(24px)';
+            } else {
+                vibrateBtn.classList.remove('bg-blue-500');
+                vibrateBtn.classList.add('bg-gray-200');
+                vibrateKnob.style.transform = 'translateX(4px)';
+            }
+        }
+
+        function triggerVibration(mode) {
+            if (!settings.vibrate || !navigator.vibrate) return;
+            if (mode === 'step') {
+                navigator.vibrate(60);
+            } else if (mode === 'finish') {
+                navigator.vibrate([100, 80, 100, 150, 400]);
+            }
+        }
+
+        function updateDisplay() {
+            remainingTime = settings.totalMinutes * 60;
+            const m = Math.floor(remainingTime / 60).toString().padStart(2, '0');
+            const s = (remainingTime % 60).toString().padStart(2, '0');
+            timerDisplay.innerText = `${m}:${s}`;
+            applyTranslations();
+        }
+
+        function toggleUI(meditating) {
+            const opacity = meditating ? '0' : '1';
+            const pointer = meditating ? 'none' : 'auto';
+            headerIcons.style.opacity = opacity;
+            headerIcons.style.pointerEvents = pointer;
+        }
+
+        function startMeditation() {
+            isMeditating = true;
+            toggleUI(true);
+            mainTimerInterval = setInterval(() => {
+                remainingTime--;
+                const m = Math.floor(remainingTime / 60).toString().padStart(2, '0');
+                const s = (remainingTime % 60).toString().padStart(2, '0');
+                timerDisplay.innerText = `${m}:${s}`;
+                if (remainingTime <= 0) finishMeditation();
+            }, 1000);
+            runBreathCycle('exhale');
+        }
+
+        function stopMeditation() {
+            isMeditating = false;
+            toggleUI(false);
+            clearInterval(mainTimerInterval);
+            clearTimeout(breathTimeout);
+            breathBg.style.transitionDuration = '1s';
+            breathBg.style.transform = 'scale(1)';
+            applyTranslations();
+            updateDisplay();
+        }
+
+        async function finishMeditation() {
+            isMeditating = false;
+            clearInterval(mainTimerInterval);
+            clearTimeout(breathTimeout);
+            triggerVibration('finish');
+            await generateShareImage();
+            finishOverlay.style.display = 'flex';
+        }
+
+        async function generateShareImage() {
+            const currentLang = detectLang();
+            const t = translations[currentLang];
+            const ctx = shareCanvas.getContext('2d');
+            const now = new Date();
+            const hour = now.getHours();
+            
+            let gradStart = "#0F2027", gradEnd = "#2C5364"; 
+            if (hour >= 5 && hour < 11) { gradStart = "#FF8C00"; gradEnd = "#F8FFAE"; }
+            else if (hour >= 11 && hour < 17) { gradStart = "#56ab2f"; gradEnd = "#a8e063"; }
+            else if (hour >= 17 && hour < 19) { gradStart = "#ee0979"; gradEnd = "#ff6a00"; }
+            
+            const grad = ctx.createLinearGradient(0, 0, 0, 630);
+            grad.addColorStop(0, gradStart); grad.addColorStop(1, gradEnd);
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, 1200, 630);
+            
+            ctx.fillStyle = "rgba(0,0,0,0.15)";
+            ctx.beginPath(); ctx.arc(600, 850, 500, 0, Math.PI * 2); ctx.fill();
+            
+            ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.shadowColor = "rgba(0,0,0,0.2)"; ctx.shadowBlur = 10;
+            
+            // 時間帯ラベルを削除し、タイトルのみを表示
+            const titleText = t.shareCanvasTitle;
+            
+            ctx.font = "bold 45px 'Noto Sans JP', 'Inter', sans-serif"; 
+            ctx.fillText(titleText, 600, 150);
+            
+            ctx.font = "bold 220px 'Inter', sans-serif"; 
+            ctx.fillText(settings.totalMinutes, 600, 380);
+            
+            ctx.font = "bold 60px 'Inter', 'Noto Sans JP', sans-serif"; 
+            ctx.fillText(t.shareCanvasMin, 600, 480);
+            
+            ctx.font = "30px 'Noto Sans JP', 'Inter', sans-serif"; 
+            ctx.fillText(t.shareCanvasSub, 600, 560);
+            
+            ctx.globalAlpha = 0.5; ctx.font = "20px 'Inter', sans-serif"; 
+            ctx.fillText(t.shareCanvasApp, 600, 610);
+            ctx.globalAlpha = 1;
+            
+            previewImage.src = shareCanvas.toDataURL('image/png');
+        }
+
+        function runBreathCycle(phase) {
+            if (!isMeditating) return;
+            const currentLang = detectLang();
+            const t = translations[currentLang];
+            let duration = 0;
+            triggerVibration('step');
+            switch (phase) {
+                case 'exhale':
+                    duration = settings.exhaleTime;
+                    phaseText.innerText = t.exhale;
+                    breathBg.style.transitionDuration = `${duration}s`;
+                    breathBg.style.transform = 'scale(0.35)';
+                    breathTimeout = setTimeout(() => runBreathCycle('inhale'), duration * 1000);
+                    break;
+                case 'inhale':
+                    duration = settings.inhaleTime;
+                    phaseText.innerText = t.inhale;
+                    breathBg.style.transitionDuration = `${duration}s`;
+                    breathBg.style.transform = 'scale(1)';
+                    breathTimeout = setTimeout(() => runBreathCycle('hold'), duration * 1000);
+                    break;
+                case 'hold':
+                    duration = settings.holdTime;
+                    phaseText.innerText = t.hold;
+                    breathBg.style.transitionDuration = `${duration}s`;
+                    breathBg.style.transform = 'scale(1)';
+                    breathTimeout = setTimeout(() => runBreathCycle('exhale'), duration * 1000);
+                    break;
+            }
+        }
+
+        function showToast(message) {
+            toast.innerText = message;
+            toast.style.opacity = '1';
+            setTimeout(() => toast.style.opacity = '0', 3500);
+        }
+
+        // イベント登録
+        breathTrigger.addEventListener('click', () => isMeditating ? stopMeditation() : startMeditation());
+        
+        vibrateBtn.addEventListener('click', () => {
+            settings.vibrate = !settings.vibrate;
+            updateVibrateUI();
+            if (settings.vibrate) triggerVibration('step');
+        });
+
+        document.getElementById('input-lang').addEventListener('change', (e) => {
+            const tempSettings = {...settings, lang: e.target.value};
+            const currentLang = tempSettings.lang === 'auto' ? (navigator.language.startsWith('ja') ? 'ja' : 'en') : tempSettings.lang;
+            const otherLang = currentLang === 'ja' ? 'en' : 'ja';
+            const t = translations[currentLang];
+            const otherT = translations[otherLang];
+            const messageInput = document.getElementById('input-message');
+            if (messageInput.value === otherT.defaultMsg || messageInput.value === "") {
+                messageInput.value = t.defaultMsg;
+            }
+        });
+
+        document.getElementById('btn-settings').addEventListener('click', () => {
+            document.getElementById('input-lang').value = settings.lang;
+            modalSettings.classList.add('active');
+        });
+        document.getElementById('btn-info').addEventListener('click', () => modalInfo.classList.add('active'));
+        
+        document.querySelectorAll('.close-modal').forEach(b => b.addEventListener('click', () => {
+            modalSettings.classList.remove('active'); 
+            modalInfo.classList.remove('active');
+        }));
+
+        document.getElementById('btn-save-settings').addEventListener('click', () => {
+            settings.lang = document.getElementById('input-lang').value;
+            settings.totalMinutes = parseInt(document.getElementById('input-total-time').value) || 2;
+            settings.exhaleTime = parseInt(document.getElementById('input-exhale').value) || 15;
+            settings.inhaleTime = parseInt(document.getElementById('input-inhale').value) || 3;
+            settings.holdTime = parseInt(document.getElementById('input-hold').value) || 2;
+            settings.message = document.getElementById('input-message').value || translations[detectLang()].defaultMsg;
+            updateDisplay();
+            modalSettings.classList.remove('active');
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            finishOverlay.style.display = 'none';
+            stopMeditation();
+        });
+
+        document.getElementById('btn-copy-image').addEventListener('click', () => {
+            const currentLang = detectLang();
+            const t = translations[currentLang];
+            shareCanvas.toBlob(async (blob) => {
+                try {
+                    if (navigator.clipboard && navigator.clipboard.write) {
+                        const item = new ClipboardItem({ [blob.type]: blob });
+                        await navigator.clipboard.write([item]);
+                        showToast(t.toastCopyOk);
+                    } else {
+                        throw new Error("Clipboard API not supported");
+                    }
+                } catch (err) {
+                    showToast(t.toastPreview);
+                    const link = document.createElement('a');
+                    link.download = 'meditation_result.png';
+                    link.href = previewImage.src;
+                    link.click();
+                }
+            }, 'image/png');
+        });
+
+        document.getElementById('btn-post-x').addEventListener('click', () => {
+            const currentLang = detectLang();
+            const t = translations[currentLang];
+            const currentUrl = window.location.href;
+            const shareText = `${settings.totalMinutes}${t.xShareText}${currentUrl}`;
+            const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+            window.open(xUrl, '_blank');
+        });
+
+        const initialLang = detectLang();
+        document.getElementById('input-message').value = translations[initialLang].defaultMsg;
+        settings.message = translations[initialLang].defaultMsg;
+        updateDisplay();
+    </script>
+</body>
+</html>
