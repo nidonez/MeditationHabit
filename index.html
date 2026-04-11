@@ -8,6 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js" type="module"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400&family=Noto+Sans+JP:wght@100;200;300;400&display=swap" rel="stylesheet">
     
     <style>
@@ -26,16 +31,19 @@
             flex-direction: column;
             user-select: none;
             margin: 0;
-            overflow: hidden; /* 画面全体のスクロールを完全に禁止 */
+            overflow: hidden; 
             -webkit-overflow-scrolling: touch;
         }
 
         /* --- 魔法陣アニメーション --- */
         #visual-container {
             position: absolute;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: visible; 
         }
 
         .visual-layer {
@@ -44,12 +52,13 @@
             left: 50%;
             transform: translate(-50%, -50%) scale(1) rotate(0deg);
             opacity: 1;
+            aspect-ratio: 1/1; 
         }
 
         .magic-glow {
-            width: 120%; height: 120%;
+            width: 130%; height: 130%;
             background: radial-gradient(circle, rgba(0, 255, 230, 0.25) 0%, rgba(0, 150, 255, 0.08) 40%, rgba(0,0,0,0) 70%);
-            filter: blur(30px);
+            filter: blur(40px);
             border-radius: 50%;
         }
 
@@ -65,11 +74,11 @@
             box-shadow: inset 0 0 15px rgba(0, 255, 230, 0.2), 0 0 15px rgba(0, 255, 230, 0.2);
         }
 
-        .orb-layer { width: 80%; height: 80%; }
+        .orb-layer { width: 95%; height: 95%; }
         .orb {
             position: absolute;
-            top: 25%; left: 25%;
-            width: 50%; height: 50%;
+            top: 20%; left: 20%;
+            width: 60%; height: 60%; 
             border-radius: 50%;
             background: rgba(0, 240, 255, 0.15);
             mix-blend-mode: screen;
@@ -97,7 +106,7 @@
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            overflow-y: auto; /* モーダル内はスクロール可能 */
+            overflow-y: auto;
             padding: 2rem 1rem;
         }
         .modal.active { opacity: 1; pointer-events: auto; }
@@ -110,7 +119,7 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.8);
         }
 
-        input, select {
+        input {
             background-color: rgba(255, 255, 255, 0.05) !important;
             color: white !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;
             font-family: inherit;
@@ -121,9 +130,7 @@
             -webkit-appearance: none; 
             margin: 0; 
         }
-        input[type=number] {
-            -moz-appearance: textfield;
-        }
+        input[type=number] { -moz-appearance: textfield; }
 
         #finish-overlay {
             display: none; position: fixed; inset: 0; z-index: 10000;
@@ -151,11 +158,31 @@
             letter-spacing: 0.4em;
             text-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
         }
+
+        .lang-button {
+            flex: 1;
+            padding: 12px 8px;
+            font-size: 12px;
+            font-weight: 300;
+            text-align: center;
+            border-radius: 12px;
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+        }
+        .lang-button.active {
+            background: rgba(0, 255, 230, 0.2);
+            border-color: rgba(0, 255, 230, 0.5);
+            color: white;
+            font-weight: 400;
+        }
     </style>
 </head>
 <body class="safe-area-inset">
 
-    <header class="w-full max-w-lg mx-auto flex justify-between items-center p-6 shrink-0 relative z-50 transition-opacity duration-300" id="header-icons">
+    <header class="w-full max-w-lg mx-auto flex justify-between items-center p-6 shrink-0 relative z-50 bg-transparent" id="header-icons">
         <button id="btn-sound" class="w-12 h-12 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 shadow-sm active:scale-90 transition-all cursor-pointer touch-manipulation">
             <i id="icon-sound" class="ph ph-speaker-high text-2xl text-cyan-400 pointer-events-none"></i>
         </button>
@@ -169,9 +196,10 @@
         </div>
     </header>
 
-    <main class="flex-grow flex flex-col items-center justify-center w-full px-6 relative overflow-hidden">
+    <main class="flex-grow flex flex-col items-center justify-center w-full px-6 relative overflow-visible">
         
-        <div id="breath-trigger" class="relative flex items-center justify-center w-[85vw] h-[85vw] max-w-[450px] max-h-[450px] md:max-w-[500px] md:max-h-[500px] cursor-pointer group active:opacity-95 transition-all z-10 touch-manipulation mb-8">
+        <div id="breath-trigger" class="relative flex items-center justify-center cursor-pointer group active:opacity-95 transition-all z-10 touch-manipulation" 
+             style="width: min(90vw, 65vh, 500px); height: min(90vw, 65vh, 500px); flex-shrink: 0; aspect-ratio: 1/1;">
             <div id="visual-container" class="pointer-events-none"></div>
             
             <div class="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none text-center">
@@ -180,13 +208,11 @@
             </div>
         </div>
         
-        <div class="text-center relative z-20 pointer-events-none shrink-0 pb-4">
+        <div class="text-center relative z-20 pointer-events-none shrink-0 pb-4 mt-4">
             <div id="custom-message-display" class="text-[7vw] md:text-3xl font-light text-white/90 modern-text pointer-events-auto cursor-pointer transition hover:text-cyan-300 touch-manipulation" onclick="document.getElementById('modal-settings').classList.add('active')">考えない</div>
-            <p id="hint-text" class="text-[10px] text-gray-500 mt-3 tracking-widest pointer-events-none transition-opacity duration-300">※メッセージや時間は設定で変更できます</p>
+            <p id="hint-text" class="text-[10px] text-gray-500 mt-2 tracking-widest pointer-events-none transition-opacity duration-300">※メッセージや時間は設定で変更できます</p>
         </div>
     </main>
-
-    <!-- 不要なフッター領域を削除してスペースを確保 -->
 
     <div id="finish-overlay">
         <div class="w-full max-w-sm text-center">
@@ -195,10 +221,10 @@
             
             <div class="space-y-4 w-full px-4 pb-12">
                 <button id="btn-copy-img" class="w-full py-4 rounded-full font-medium flex items-center justify-center gap-3 bg-white text-black hover:bg-gray-100 transition active:scale-95 cursor-pointer touch-manipulation">
-                    <i class="ph ph-copy text-2xl pointer-events-none"></i><span>画像をコピーする</span>
+                    <i class="ph ph-copy text-2xl pointer-events-none"></i><span id="label-copy-img">画像をコピーする</span>
                 </button>
                 <button id="btn-post-x" class="w-full py-4 rounded-full font-medium flex items-center justify-center gap-3 bg-black text-white border border-gray-700 hover:bg-gray-900 transition active:scale-95 cursor-pointer touch-manipulation">
-                    <i class="ph ph-x-logo text-2xl pointer-events-none"></i><span>Xに投稿する</span>
+                    <i class="ph ph-x-logo text-2xl pointer-events-none"></i><span id="label-post-x">Xに投稿する</span>
                 </button>
                 <button id="btn-reset" class="w-full bg-white/10 text-white/80 py-4 mt-6 rounded-full font-light transition active:scale-95 hover:bg-white/20 cursor-pointer touch-manipulation">完了して戻る</button>
             </div>
@@ -207,7 +233,7 @@
 
     <div id="modal-pause" class="modal">
         <div class="glass-panel my-auto text-center w-full">
-            <h2 class="text-2xl mb-8 font-light tracking-widest text-white">一時停止中</h2>
+            <h2 class="text-2xl mb-8 font-light tracking-widest text-white" id="label-paused">一時停止中</h2>
             <button id="btn-resume" class="w-full py-4 mb-4 rounded-full bg-white text-black font-medium transition active:scale-95 cursor-pointer touch-manipulation">再開する</button>
             <button id="btn-stop" class="w-full py-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition active:scale-95 cursor-pointer touch-manipulation">やめる</button>
         </div>
@@ -220,29 +246,7 @@
                     <i class="ph ph-x text-xl pointer-events-none"></i>
                 </button>
             </div>
-            
-            <div class="text-gray-300 leading-relaxed font-extralight text-sm">
-                <section>
-                    <h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest">なぜ「吐く」から始まるのか？</h3>
-                    <p class="m-0">肺の中の古い空気を出し切ることで、自然と新鮮な空気が入ります。「手放すことが先」という教えです。</p>
-                    <p class="text-[10px] italic text-right m-0">参照：『新版 呼吸の本』 谷川 俊太郎 (著), 加藤 俊朗 (著)</p>
-                </section>
-                
-                <section class="mt-4">
-                    <h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest italic">「3秒吸って、2秒溜めて、15秒吐く」</h3>
-                    <p class="m-0">現代人は呼吸が浅くはやくなっている。深い呼吸の力を取り戻す時、からだは疲れにくく集中力は飛躍的に向上する。そして心に中心軸が生まれる－かつて日本人が持っていた「呼吸力」を取り戻す感動の一冊</p>
-                    <p class="text-[10px] italic text-right m-0">参照：『呼吸入門』 齋藤 孝</p>
-                </section>
-                
-                <section class="mt-4">
-                    <h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest">瞑想の効用・メリット</h3>
-                    <ul class="list-disc pl-6 m-0">
-                        <li>ストレスや不安を和らげ、心が落ち着く</li>
-                        <li>集中力や記憶力が向上し、頭がスッキリする</li>
-                        <li>自律神経が整い、睡眠の質が改善される</li>
-                    </ul>
-                </section>
-            </div>
+            <div id="info-content" class="text-gray-300 leading-relaxed font-extralight text-sm"></div>
         </div>
     </div>
 
@@ -252,14 +256,14 @@
     <div id="modal-settings" class="modal">
         <div class="glass-panel my-auto w-full">
             <div class="flex justify-between items-center mb-8">
-                <h2 class="text-2xl font-light text-white tracking-[0.3em]">設定</h2>
+                <h2 class="text-2xl font-light text-white tracking-[0.3em]" id="label-settings">設定</h2>
                 <button class="close-modal w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-gray-400 hover:text-white cursor-pointer touch-manipulation">
                     <i class="ph ph-x text-xl pointer-events-none"></i>
                 </button>
             </div>
-            <div class="space-y-8">
+            <div class="space-y-6">
                 <div>
-                    <label class="block text-[11px] text-gray-500 mb-4 tracking-widest uppercase">全体の瞑想時間 (分)</label>
+                    <label class="block text-[11px] text-gray-500 mb-4 tracking-widest uppercase" id="label-total-time">全体の瞑想時間 (分)</label>
                     <div class="flex items-center justify-between bg-white/5 rounded-2xl p-2 border border-white/20">
                         <button type="button" class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-total-time', -1)">
                             <i class="ph ph-minus text-xl pointer-events-none"></i>
@@ -272,7 +276,7 @@
                 </div>
                 <div class="grid grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-[10px] text-gray-500 mb-2 text-center">吐く(秒)</label>
+                        <label class="block text-[10px] text-gray-500 mb-2 text-center" id="label-exhale">吐く(秒)</label>
                         <div class="flex flex-col items-center bg-white/5 rounded-xl p-1 border border-white/20">
                             <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-exhale', 1)"><i class="ph ph-caret-up pointer-events-none"></i></button>
                             <input type="number" id="input-exhale" class="w-full py-2 text-center outline-none font-light bg-transparent text-white border-none !border-transparent !bg-transparent" style="border:none !important;">
@@ -280,7 +284,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[10px] text-gray-500 mb-2 text-center">吸う(秒)</label>
+                        <label class="block text-[10px] text-gray-500 mb-2 text-center" id="label-inhale">吸う(秒)</label>
                         <div class="flex flex-col items-center bg-white/5 rounded-xl p-1 border border-white/20">
                             <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-inhale', 1)"><i class="ph ph-caret-up pointer-events-none"></i></button>
                             <input type="number" id="input-inhale" class="w-full py-2 text-center outline-none font-light bg-transparent text-white border-none !border-transparent !bg-transparent" style="border:none !important;">
@@ -288,7 +292,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[10px] text-gray-500 mb-2 text-center">ためる(秒)</label>
+                        <label class="block text-[10px] text-gray-500 mb-2 text-center" id="label-hold">ためる(秒)</label>
                         <div class="flex flex-col items-center bg-white/5 rounded-xl p-1 border border-white/20">
                             <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-hold', 1)"><i class="ph ph-caret-up pointer-events-none"></i></button>
                             <input type="number" id="input-hold" class="w-full py-2 text-center outline-none font-light bg-transparent text-white border-none !border-transparent !bg-transparent" style="border:none !important;">
@@ -297,230 +301,161 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-[11px] text-gray-500 mb-4 tracking-widest uppercase">メッセージ（※自由に変更できます）</label>
+                    <label class="block text-[11px] text-gray-500 mb-4 tracking-widest uppercase" id="label-message-edit">メッセージ（※自由に変更できます）</label>
                     <input type="text" id="input-message" maxlength="20" class="w-full rounded-2xl p-4 outline-none text-center">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] text-gray-500 mb-3 tracking-widest uppercase" id="label-lang-select">言語 / Language</label>
+                    <div class="flex gap-2">
+                        <button type="button" class="lang-button" data-lang="auto" onclick="setLanguage('auto')">Auto</button>
+                        <button type="button" class="lang-button" data-lang="ja" onclick="setLanguage('ja')">日本語</button>
+                        <button type="button" class="lang-button" data-lang="en" onclick="setLanguage('en')">English</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        // --- 1. 基本設定と保存データの読み込み ---
-        const STORAGE_KEY = "meditation_habit_settings_v8";
-        const DEFAULT_SETTINGS = {
-            totalMinutes: 2,
-            exhaleTime: 15,
-            inhaleTime: 3,
-            holdTime: 2,
-            message: "考えない",
-            soundEnabled: true
-        };
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, updateDoc, setDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- Firebase 初期化 ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'meditation-habit-v1';
+
+        // --- 1. 基本設定 ---
+        const STORAGE_KEY = "meditation_habit_settings_v9";
+        const DEFAULT_SETTINGS = { totalMinutes: 2, exhaleTime: 15, inhaleTime: 3, holdTime: 2, message: "考えない", soundEnabled: true, lang: "auto" };
         let settings = { ...DEFAULT_SETTINGS };
         const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            try { settings = { ...settings, ...JSON.parse(saved) }; } catch(e) {}
-        }
+        if (saved) { try { settings = { ...settings, ...JSON.parse(saved) }; } catch(e) {} }
 
-        let isMeditating = false;
-        let isPaused = false;
-        let currentPhaseStr = '';
-        let remainingSeconds = settings.totalMinutes * 60;
-        let timerInterval = null;
-        let breathTimeout = null;
+        let isMeditating = false, isPaused = false, currentPhaseStr = '', remainingSeconds = settings.totalMinutes * 60;
+        let timerInterval = null, breathTimeout = null;
 
         const I18N = {
             ja: {
-                start: "はじめる", inhale: "吸う", hold: "ためる", exhale: "息をはく",
-                inhaleVoice: "すって", holdVoice: "ためて", exhaleVoice: "はいて", 
-                shareText: "心を整え、新たな一歩を。", 
-                postOk: "画像をコピーしました！X等に貼り付けてください。",
-                xShareText: "分間の瞑想を完了しました。心を整え、新たな一歩を。 #瞑想 #瞑想習慣 #声で瞑想"
+                start: "はじめる", inhale: "吸う", hold: "ためる", exhale: "息をはく", inhaleVoice: "すって", holdVoice: "ためて", exhaleVoice: "はいて", 
+                defaultMessage: "考えない",
+                shareText: "心を整え、新たな一歩を。", postOk: "画像をコピーしました！X等に貼り付けてください。",
+                xShareText: "分間の瞑想を完了しました。心を整え、新たな一歩を。 #瞑想 #瞑想習慣 #声で瞑想",
+                minutesLabel: "M I N U T E S", finishTitle: "瞑想を完了しました", copyImg: "画像をコピーする", postX: "Xに投稿する", finishBack: "完了して戻る",
+                paused: "一時停止中", resume: "再開する", stop: "やめる", settings: "設定", langSelect: "言語 / Language",
+                totalTime: "全体の瞑想時間 (分)", exhaleLabel: "吐く(秒)", inhaleLabel: "吸う(秒)", holdLabel: "ためる(秒)",
+                messageEdit: "メッセージ（※自由に変更できます）", hint: "※メッセージや時間は設定で変更できます",
+                info: {
+                    whyExhale: "なぜ「吐く」から始まるのか？", whyExhaleDesc: "肺の中の古い空気が出し切ることで、自然と新鮮な空気が入ります。「手放すことが先」という教えです。", whyExhaleRef: "参照：『新版 呼吸の本』 谷川 俊太郎 (著), 加藤 俊朗 (著)",
+                    rhythmTitle: "「3秒吸って、2秒溜めて、15秒吐く」", rhythmDesc: "現代人は呼吸が浅くはやくなっている。深い呼吸の力を取り戻す時、からだは疲れにくく集中力は飛躍的に向上する。そこで心に中心軸が生まれる－かつて日本人が持っていた「呼吸力」を取り戻す感動の一冊", rhythmRef: "参照：『呼吸入門』 齋藤 孝",
+                    benefitsTitle: "瞑想の効用・メリット", benefit1: "ストレスや不安を和らげ、心が落ち着く", benefit2: "集中力や記憶力が向上し、頭がスッキリする", benefit3: "自律神経が整い、睡眠の質が改善される"
+                }
             },
             en: {
-                start: "Start", inhale: "Inhale", hold: "Hold", exhale: "Exhale",
-                inhaleVoice: "Inhale", holdVoice: "Hold", exhaleVoice: "Exhale",
-                shareText: "Align your heart, take a new step.",
-                postOk: "Image copied!",
-                xShareText: " minutes of meditation completed. Align your heart, take a new step. #Meditation #MeditationHabit #VoiceMeditation"
+                start: "START", inhale: "INHALE", hold: "HOLD", exhale: "EXHALE", inhaleVoice: "Inhale", holdVoice: "Hold", exhaleVoice: "Exhale",
+                defaultMessage: "Clear your mind",
+                shareText: "Align your heart, take a new step.", postOk: "Image copied!",
+                xShareText: " minutes of meditation completed. Align your heart, take a new step. #Meditation #MeditationHabit #VoiceMeditation",
+                minutesLabel: "M I N U T E S", finishTitle: "Meditation Completed", copyImg: "Copy Image", postX: "Post to X", finishBack: "Done",
+                paused: "Paused", resume: "Resume", stop: "Stop", settings: "Settings", langSelect: "Language",
+                totalTime: "Total Duration (min)", exhaleLabel: "Exhale (sec)", inhaleLabel: "Inhale (sec)", holdLabel: "Hold (sec)",
+                messageEdit: "Message (Customizable)", hint: "*Settings to change message or time",
+                info: {
+                    whyExhale: "Why start by exhaling?", whyExhaleDesc: "By completely emptying the lungs of stale air, fresh air enters naturally. The principle is 'letting go first'.", whyExhaleRef: "Ref: 'The Book of Breathing' Shuntaro Tanikawa / Toshiro Kato",
+                    rhythmTitle: "3s Inhale, 2s Hold, 15s Exhale", rhythmDesc: "Modern people's breathing has become shallow and fast. Regaining the power of deep breathing makes the body less tired and dramatically improves concentration.", rhythmRef: "Ref: 'Introduction to Breathing' Takashi Saito",
+                    benefitsTitle: "Benefits of Meditation", benefit1: "Reduces stress and anxiety", benefit2: "Improves focus and mental clarity", benefit3: "Balances the nervous system"
+                }
             }
         };
 
-        // --- 2. 魔法陣DOM生成 ---
+        function getCurLang() { return settings.lang !== "auto" ? settings.lang : (navigator.language.startsWith('ja') ? 'ja' : 'en'); }
+
         const visualContainer = document.getElementById("visual-container");
         visualContainer.innerHTML = `
             <div class="visual-layer magic-glow"></div>
             <div class="visual-layer ring-outer"></div>
             <div class="visual-layer ring-mid"></div>
             <div class="visual-layer ring-inner"></div>
-            <div class="visual-layer magic-geometry">
-                <div class="geom-square" style="transform:rotate(0deg)"></div>
-                <div class="geom-square" style="transform:rotate(30deg)"></div>
-                <div class="geom-square" style="transform:rotate(60deg)"></div>
-            </div>
-            <div class="visual-layer orb-layer">
-                ${Array.from({length:6}).map((_,i) => `<div class="orb" style="transform: rotate(${i*60}deg) translateY(-45%)"></div>`).join('')}
-            </div>
+            <div class="visual-layer magic-geometry"><div class="geom-square" style="transform:rotate(0deg)"></div><div class="geom-square" style="transform:rotate(30deg)"></div><div class="geom-square" style="transform:rotate(60deg)"></div></div>
+            <div class="visual-layer orb-layer">${Array.from({length:6}).map((_,i) => `<div class="orb" style="transform: rotate(${i*60}deg) translateY(-55%)"></div>`).join('')}</div>
             <div class="visual-layer magic-core"></div>
         `;
 
-        let curRings = [0, 0, 0];
-        let curGeom = 0;
-        let curOrbLayer = 0;
+        let curRings = [0, 0, 0], curGeom = 0, curOrbLayer = 0;
 
         function setVisuals(phase, duration) {
             let t = `all ${duration}s linear`, op, sc, orbT;
-
-            if (phase === 'exhale') {
-                op = 0; sc = 0.1; orbT = 0;
-                curRings[0] += 180; curRings[1] -= 180; curRings[2] += 180; curGeom -= 180; curOrbLayer += 90;
-            } else if (phase === 'inhale') {
-                op = 1; sc = 1.0; orbT = 45;
-                curRings[0] += 120; curRings[1] -= 90; curRings[2] += 120; curGeom -= 90; curOrbLayer += 60;
-            } else if (phase === 'hold') {
-                op = 1; sc = 1.1; orbT = 50;
-                curRings[0] += 30; curRings[1] -= 20; curRings[2] += 30; curGeom -= 20; curOrbLayer += 15;
-            } else {
-                t = "none"; op = 1; sc = 1.0; orbT = 45; curRings = [0,0,0]; curGeom = 0; curOrbLayer = 0;
-            }
-
-            const apply = (sel, s, r) => {
-                const el = document.querySelector(sel);
-                if(el) { el.style.transition = t; el.style.transform = `translate(-50%, -50%) scale(${s}) rotate(${r}deg)`; el.style.opacity = op; }
-            };
-
-            apply('.magic-glow', sc*1.2, 0); apply('.magic-core', sc, 0);
-            apply('.ring-outer', sc, curRings[0]); apply('.ring-mid', sc, curRings[1]); apply('.ring-inner', sc, curRings[2]);
-            apply('.magic-geometry', sc, curGeom); apply('.orb-layer', sc, curOrbLayer);
-            
-            document.querySelectorAll('.orb').forEach((o, i) => {
-                o.style.transition = t; o.style.transform = `rotate(${i*60}deg) translateY(-${orbT}%)`; o.style.opacity = op;
-            });
+            if (phase === 'exhale') { op = 0; sc = 0.1; orbT = 0; curRings[0]+=180; curRings[1]-=180; curRings[2]+=180; curGeom-=180; curOrbLayer+=90; }
+            else if (phase === 'inhale') { op = 1; sc = 1.0; orbT = 55; curRings[0]+=120; curRings[1]-=90; curRings[2]+=120; curGeom-=90; curOrbLayer+=60; }
+            else if (phase === 'hold') { op = 1; sc = 1.1; orbT = 60; curRings[0]+=30; curRings[1]-=20; curRings[2]+=30; curGeom-=20; curOrbLayer+=15; }
+            else { t = "none"; op = 1; sc = 1.0; orbT = 55; curRings = [0,0,0]; curGeom = 0; curOrbLayer = 0; }
+            const apply = (sel, s, r) => { const el = document.querySelector(sel); if(el){ el.style.transition = t; el.style.transform = `translate(-50%, -50%) scale(${s}) rotate(${r}deg)`; el.style.opacity = op; } };
+            apply('.magic-glow', sc*1.2, 0); apply('.magic-core', sc, 0); apply('.ring-outer', sc, curRings[0]); apply('.ring-mid', sc, curRings[1]); apply('.ring-inner', sc, curRings[2]); apply('.magic-geometry', sc, curGeom); apply('.orb-layer', sc, curOrbLayer);
+            document.querySelectorAll('.orb').forEach((o, i) => { o.style.transition = t; o.style.transform = `rotate(${i*60}deg) translateY(-${orbT}%)`; o.style.opacity = op; });
         }
 
-        // --- 3. サウンド ---
         let audioCtx = null;
         function playBreathSound(phase, duration) {
             if (!settings.soundEnabled || phase === 'hold') return;
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (audioCtx.state === 'suspended') audioCtx.resume();
-
-            const now = audioCtx.currentTime;
-            const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
+            const now = audioCtx.currentTime, buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate), data = buffer.getChannelData(0);
             for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
             const noise = audioCtx.createBufferSource(); noise.buffer = buffer; noise.loop = true;
             const noiseFilter = audioCtx.createBiquadFilter(); noiseFilter.type = 'lowpass';
-            const noiseGain = audioCtx.createGain();
-            noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination);
+            const noiseGain = audioCtx.createGain(); noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination);
             const harpGain = audioCtx.createGain(); harpGain.connect(audioCtx.destination);
             const freqs = phase === 'inhale' ? [440, 554, 659] : [392, 329, 261];
-
-            if (phase === 'inhale') {
-                noiseFilter.frequency.setValueAtTime(200, now);
-                noiseFilter.frequency.exponentialRampToValueAtTime(800, now + duration);
-                noiseGain.gain.setValueAtTime(0, now);
-                noiseGain.gain.linearRampToValueAtTime(0.06, now + 0.5);
-                noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + duration + 4.0);
-            } else {
-                noiseFilter.frequency.setValueAtTime(800, now);
-                noiseFilter.frequency.exponentialRampToValueAtTime(150, now + duration);
-                noiseGain.gain.setValueAtTime(0.06, now);
-                noiseGain.gain.linearRampToValueAtTime(0, now + duration);
-            }
+            if (phase === 'inhale') { noiseFilter.frequency.setValueAtTime(200, now); noiseFilter.frequency.exponentialRampToValueAtTime(800, now + duration); noiseGain.gain.setValueAtTime(0, now); noiseGain.gain.linearRampToValueAtTime(0.06, now + 0.5); noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + duration + 4.0); }
+            else { noiseFilter.frequency.setValueAtTime(800, now); noiseFilter.frequency.exponentialRampToValueAtTime(150, now + duration); noiseGain.gain.setValueAtTime(0.06, now); noiseGain.gain.linearRampToValueAtTime(0, now + duration); }
             noise.start(now); noise.stop(now + duration + 4.0);
-
-            freqs.forEach((f, i) => {
-                const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
-                osc.type = 'sine'; osc.frequency.setValueAtTime(f, now + i * 0.1);
-                osc.connect(g); g.connect(harpGain);
-                g.gain.setValueAtTime(0, now + i * 0.1);
-                g.gain.linearRampToValueAtTime(0.05, now + i * 0.1 + 0.01);
-                g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.1 + 4.0);
-                osc.start(now + i * 0.1); osc.stop(now + i * 0.1 + 4.0);
-            });
+            freqs.forEach((f, i) => { const osc = audioCtx.createOscillator(), g = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(f, now + i * 0.1); osc.connect(g); g.connect(harpGain); g.gain.setValueAtTime(0, now + i * 0.1); g.gain.linearRampToValueAtTime(0.05, now + i * 0.1 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.1 + 4.0); osc.start(now + i * 0.1); osc.stop(now + i * 0.1 + 4.0); });
         }
 
-        function speak(text) {
-            if (!settings.soundEnabled || !window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(text);
-            u.lang = (navigator.language.startsWith('ja') ? 'ja-JP' : 'en-US');
-            window.speechSynthesis.speak(u);
-        }
-
-        // --- 4. 実行ロジック ---
-        function getLang() { return navigator.language.startsWith('ja') ? 'ja' : 'en'; }
-
-        function runLoop(phase) {
-            if (!isMeditating || isPaused) return;
-            currentPhaseStr = phase;
-            const t = I18N[getLang()];
-            const txt = document.getElementById("phase-text");
-
-            if (phase === 'exhale') {
-                txt.innerText = t.exhale; speak(t.exhaleVoice);
-                setTimeout(() => { if (isMeditating && !isPaused) playBreathSound('exhale', settings.exhaleTime); }, 1500);
-                setVisuals('exhale', settings.exhaleTime);
-                breathTimeout = setTimeout(() => { if (!isPaused) runLoop('inhale'); }, settings.exhaleTime * 1000);
-            } else if (phase === 'inhale') {
-                txt.innerText = t.inhale; speak(t.inhaleVoice);
-                setTimeout(() => { if (isMeditating && !isPaused) playBreathSound('inhale', settings.inhaleTime); }, 1500);
-                setVisuals('inhale', settings.inhaleTime);
-                breathTimeout = setTimeout(() => { if (!isPaused) runLoop('hold'); }, settings.inhaleTime * 1000);
-            } else {
-                txt.innerText = t.hold; speak(t.holdVoice);
-                setVisuals('hold', settings.holdTime);
-                breathTimeout = setTimeout(() => { if (!isPaused) runLoop('exhale'); }, settings.holdTime * 1000);
+        function speak(text) { 
+            if (!settings.soundEnabled || !window.speechSynthesis) return; 
+            window.speechSynthesis.cancel(); 
+            const u = new SpeechSynthesisUtterance(text); 
+            const langCode = getCurLang() === 'ja' ? 'ja-JP' : 'en-US';
+            u.lang = langCode;
+            
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                const femaleVoice = voices.find(v => 
+                    v.lang.includes(langCode) && 
+                    (v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Zira') || v.name.includes('Female'))
+                );
+                if (femaleVoice) u.voice = femaleVoice;
             }
+            window.speechSynthesis.speak(u); 
         }
 
-        function startTimer() {
-            timerInterval = setInterval(() => {
-                remainingSeconds--;
-                const m = Math.floor(remainingSeconds/60).toString().padStart(2,'0'), s = (remainingSeconds%60).toString().padStart(2,'0');
-                document.getElementById("timer-display").innerText = `${m}:${s}`;
-                if (remainingSeconds <= 0) finalize();
-            }, 1000);
+        function runLoop(phase) { if (!isMeditating || isPaused) return; currentPhaseStr = phase; const t = I18N[getCurLang()]; const txt = document.getElementById("phase-text"); if (phase === 'exhale') { txt.innerText = t.exhale; speak(t.exhaleVoice); setTimeout(() => { if (isMeditating && !isPaused) playBreathSound('exhale', settings.exhaleTime); }, 1500); setVisuals('exhale', settings.exhaleTime); breathTimeout = setTimeout(() => { if (!isPaused) runLoop('inhale'); }, settings.exhaleTime * 1000); } else if (phase === 'inhale') { txt.innerText = t.inhale; speak(t.inhaleVoice); setTimeout(() => { if (isMeditating && !isPaused) playBreathSound('inhale', settings.inhaleTime); }, 1500); setVisuals('inhale', settings.inhaleTime); breathTimeout = setTimeout(() => { if (!isPaused) runLoop('hold'); }, settings.inhaleTime * 1000); } else { txt.innerText = t.hold; speak(t.holdVoice); setVisuals('hold', settings.holdTime); breathTimeout = setTimeout(() => { if (!isPaused) runLoop('exhale'); }, settings.holdTime * 1000); } }
+        function startTimer() { timerInterval = setInterval(() => { remainingSeconds--; const m = Math.floor(remainingSeconds/60).toString().padStart(2,'0'), s = (remainingSeconds%60).toString().padStart(2,'0'); document.getElementById("timer-display").innerText = `${m}:${s}`; if (remainingSeconds <= 0) finalize(); }, 1000); }
+        function start() { isMeditating = true; isPaused = false; document.getElementById("header-icons").style.opacity = "0"; document.getElementById("header-icons").style.pointerEvents = "none"; document.getElementById("hint-text").style.opacity = "0"; remainingSeconds = settings.totalMinutes * 60; setVisuals('reset', 0); document.getElementById('visual-container').offsetHeight; runLoop('exhale'); startTimer(); }
+        function pauseMeditation() { isPaused = true; clearInterval(timerInterval); clearTimeout(breathTimeout); if (audioCtx && audioCtx.state === 'running') audioCtx.suspend(); document.getElementById("modal-pause").classList.add('active'); }
+        function resumeMeditation() { isPaused = false; document.getElementById("modal-pause").classList.remove('active'); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); startTimer(); runLoop(currentPhaseStr); }
+        async function finalize() { 
+            isMeditating = false; clearInterval(timerInterval); clearTimeout(breathTimeout); 
+            document.getElementById("header-icons").style.opacity = "1"; document.getElementById("header-icons").style.pointerEvents = "auto"; document.getElementById("hint-text").style.opacity = "1";
+            drawResult().then(() => { document.getElementById("finish-overlay").style.display = 'flex'; }); 
         }
 
-        function start() {
-            isMeditating = true; isPaused = false;
-            document.getElementById("header-icons").style.opacity = "0";
-            document.getElementById("header-icons").style.pointerEvents = "none";
-            document.getElementById("hint-text").style.opacity = "0";
-            remainingSeconds = settings.totalMinutes * 60;
-            setVisuals('reset', 0);
-            document.getElementById('visual-container').offsetHeight;
-            runLoop('exhale');
-            startTimer();
-        }
-
-        function pauseMeditation() {
-            isPaused = true; clearInterval(timerInterval); clearTimeout(breathTimeout);
-            if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
-            document.getElementById("modal-pause").classList.add('active');
-        }
-
-        function resumeMeditation() {
-            isPaused = false; document.getElementById("modal-pause").classList.remove('active');
-            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-            startTimer(); runLoop(currentPhaseStr);
-        }
-
-        function finalize() {
-            isMeditating = false; clearInterval(timerInterval); clearTimeout(breathTimeout);
-            document.getElementById("header-icons").style.opacity = "1";
-            document.getElementById("header-icons").style.pointerEvents = "auto";
-            document.getElementById("hint-text").style.opacity = "1";
-            drawResult().then(() => { document.getElementById("finish-overlay").style.display = 'flex'; });
-        }
-
-        async function drawResult() {
+        async function drawResult() { 
             const canvas = document.getElementById("share-canvas"), ctx = canvas.getContext('2d'), hr = new Date().getHours();
-            const t = I18N[getLang()];
+            const lang = getCurLang();
+            const t = I18N[lang];
+            
             const grads = { morning: ["#e0f2f1", "#80cbc4"], noon: ["#e1f5fe", "#81d4fa"], evening: ["#ffe0b2", "#ffb74d"], night: ["#040b10", "#102027"] };
-            const timeKey = hr >= 5 && hr < 11 ? 'morning' : hr < 17 ? 'noon' : hr < 19 ? 'evening' : 'night';
+            let timeKey = 'night';
+            if (hr >= 5 && hr < 11) timeKey = 'morning';
+            else if (hr >= 11 && hr < 17) timeKey = 'noon';
+            else if (hr >= 17 && hr < 21) timeKey = 'evening';
+            
             const [c1, c2] = grads[timeKey], g = ctx.createLinearGradient(0,0,0,630); g.addColorStop(0, c1); g.addColorStop(1, c2);
             ctx.fillStyle = g; ctx.fillRect(0,0,1200,630);
             
@@ -529,118 +464,62 @@
             ctx.shadowBlur = 40; ctx.shadowColor = timeKey === 'night' ? 'rgba(0, 255, 230, 0.4)' : 'rgba(255,255,255,0.8)';
             
             function drawPetal(sc, rot) {
-                ctx.save(); ctx.rotate(rot); ctx.scale(sc * 2.0, sc * 2.0); 
-                ctx.beginPath(); ctx.moveTo(0,0);
-                ctx.bezierCurveTo(45,-50,35,-130,0,-180); ctx.bezierCurveTo(-35,-130,-45,-50,0,0);
-                ctx.fill(); ctx.restore();
+                ctx.save(); ctx.rotate(rot); ctx.scale(sc * 1.4, sc * 1.4); 
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.bezierCurveTo(45,-50,35,-130,0,-180); ctx.bezierCurveTo(-35,-130,-45,-50,0,0); ctx.fill(); ctx.restore();
             }
-            drawPetal(0.7, -Math.PI/2.5); drawPetal(0.7, Math.PI/2.5);
-            drawPetal(0.85, -Math.PI/3.5); drawPetal(0.85, Math.PI/3.5);
-            drawPetal(0.95, -Math.PI/6); drawPetal(0.95, Math.PI/6);
-            drawPetal(1.0, 0);
-
-            ctx.beginPath(); ctx.moveTo(0,10);
-            ctx.quadraticCurveTo(120,10,200,-50); ctx.quadraticCurveTo(140,40,0,40);
-            ctx.quadraticCurveTo(-140,40,-200,-50); ctx.quadraticCurveTo(-120,10,0,10);
-            ctx.fill(); ctx.restore();
+            drawPetal(0.7, -Math.PI/2.5); drawPetal(0.7, Math.PI/2.5); drawPetal(0.85, -Math.PI/3.5); drawPetal(0.85, Math.PI/3.5); drawPetal(0.95, -Math.PI/6); drawPetal(0.95, Math.PI/6); drawPetal(1.0, 0);
+            ctx.beginPath(); ctx.moveTo(0,10); ctx.quadraticCurveTo(120,10,200,-50); ctx.quadraticCurveTo(140,40,0,40); ctx.quadraticCurveTo(-140,40,-200,-50); ctx.quadraticCurveTo(-120,10,0,10); ctx.fill(); ctx.restore();
             
             ctx.textAlign = 'left'; ctx.fillStyle = timeKey === 'night' ? '#fff' : '#1d1d1f';
             ctx.font = "200 160px 'Montserrat'"; ctx.fillText(String(settings.totalMinutes).padStart(2,'0'), 700, 320);
-            ctx.font = "300 24px 'Montserrat'"; ctx.fillText("M I N U T E S", 715, 380);
-            ctx.font = "200 36px 'Noto Sans JP'"; ctx.fillText(t.shareText, 715, 480);
-            document.getElementById("preview-image").src = canvas.toDataURL();
+            ctx.font = "300 24px 'Montserrat'"; ctx.fillText(t.minutesLabel, 715, 380);
+            
+            ctx.font = lang === 'en' ? "200 26px 'Montserrat'" : "200 36px 'Noto Sans JP'";
+            ctx.fillText(t.shareText, 715, 480, 420); 
+            
+            document.getElementById("preview-image").src = canvas.toDataURL(); 
         }
 
+        window.setLanguage = function(val) {
+            const oldLang = getCurLang();
+            if (settings.message === I18N[oldLang].defaultMessage) {
+                const targetLang = val === "auto" ? (navigator.language.startsWith('ja') ? 'ja' : 'en') : val;
+                settings.message = I18N[targetLang].defaultMessage;
+            }
+            settings.lang = val;
+            refresh();
+        };
+
         function refresh() {
-            document.getElementById("input-total-time").value = settings.totalMinutes;
-            document.getElementById("input-exhale").value = settings.exhaleTime;
-            document.getElementById("input-inhale").value = settings.inhaleTime;
-            document.getElementById("input-hold").value = settings.holdTime;
-            document.getElementById("input-message").value = settings.message;
-            document.getElementById("timer-display").innerText = `${String(settings.totalMinutes).padStart(2,'0')}:00`;
-            document.getElementById("custom-message-display").innerText = settings.message;
-            document.getElementById("phase-text").innerText = I18N[getLang()].start;
-            const icon = document.getElementById("icon-sound");
-            icon.className = settings.soundEnabled ? "ph ph-speaker-high text-2xl text-cyan-400" : "ph ph-speaker-slash text-2xl";
+            const lang = getCurLang(), t = I18N[lang];
+            document.getElementById("input-total-time").value = settings.totalMinutes; document.getElementById("input-exhale").value = settings.exhaleTime; document.getElementById("input-inhale").value = settings.inhaleTime; document.getElementById("input-hold").value = settings.holdTime; document.getElementById("input-message").value = settings.message;
+            document.querySelectorAll('.lang-button').forEach(btn => { btn.classList.toggle('active', btn.dataset.lang === settings.lang); });
+            document.getElementById("label-settings").innerText = t.settings; document.getElementById("label-lang-select").innerText = t.langSelect; document.getElementById("label-total-time").innerText = t.totalTime; document.getElementById("label-exhale").innerText = t.exhaleLabel; document.getElementById("label-inhale").innerText = t.inhaleLabel; document.getElementById("label-hold").innerText = t.holdLabel; document.getElementById("label-message-edit").innerText = t.messageEdit; document.getElementById("hint-text").innerText = t.hint; document.getElementById("finish-title").innerText = t.finishTitle; document.getElementById("label-copy-img").innerText = t.copyImg; document.getElementById("label-post-x").innerText = t.postX; document.getElementById("btn-reset").innerText = t.finishBack; document.getElementById("label-paused").innerText = t.paused; document.getElementById("btn-resume").innerText = t.resume; document.getElementById("btn-stop").innerText = t.stop;
+            const info = t.info; document.getElementById("info-content").innerHTML = `<section><h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest">${info.whyExhale}</h3><p class="m-0">${info.whyExhaleDesc}</p><p class="text-[10px] italic text-right m-0">${info.whyExhaleRef}</p></section><section class="mt-4"><h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest italic">${info.rhythmTitle}</h3><p class="m-0">${info.rhythmDesc}</p><p class="text-[10px] italic text-right m-0">${info.rhythmRef}</p></section><section class="mt-4"><h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest">${info.benefitsTitle}</h3><ul class="list-disc pl-6 m-0"><li>${info.benefit1}</li><li>${info.benefit2}</li><li>${info.benefit3}</li></ul></section>`;
+            document.getElementById("timer-display").innerText = `${String(settings.totalMinutes).padStart(2,'0')}:00`; document.getElementById("custom-message-display").innerText = settings.message; if(!isMeditating) document.getElementById("phase-text").innerText = t.start;
+            const icon = document.getElementById("icon-sound"); icon.className = settings.soundEnabled ? "ph ph-speaker-high text-2xl text-cyan-400" : "ph ph-speaker-slash text-2xl text-gray-400";
             localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
         }
 
-        // --- バグ解消のため、シンプルで確実な onclick 方式に統一 ---
-        document.getElementById("breath-trigger").onclick = () => { 
-            if (!isMeditating) { start(); } else if (!isPaused) { pauseMeditation(); }
+        const initApp = async () => {
+            await signInAnonymously(auth);
         };
+        initApp();
 
-        document.getElementById("btn-resume").onclick = resumeMeditation;
-        document.getElementById("btn-stop").onclick = () => location.reload();
-        
-        document.getElementById("btn-sound").onclick = (e) => { 
-            e.stopPropagation(); settings.soundEnabled = !settings.soundEnabled; refresh(); 
-        };
-        
-        document.getElementById("btn-info").onclick = (e) => { 
-            e.stopPropagation(); document.getElementById("modal-info").classList.add('active'); 
-        };
-        
-        document.getElementById("btn-settings").onclick = (e) => { 
-            e.stopPropagation(); document.getElementById("modal-settings").classList.add('active'); 
-        };
-        
-        // モーダルの × ボタン
-        document.querySelectorAll('.close-modal').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-            };
-        });
-
-        // モーダルの背景クリック
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.onclick = (e) => {
-                if (e.target === modal) {
-                    if (modal.id === 'modal-pause') { resumeMeditation(); } 
-                    else { modal.classList.remove('active'); }
-                }
-            };
-        });
-        
-        window.adjustValue = function(id, delta) {
-            const input = document.getElementById(id);
-            let val = parseInt(input.value) || 1; val += delta; if(val < 1) val = 1;
-            input.value = val; input.dispatchEvent(new Event('input'));
-        };
-
-        document.querySelectorAll('input').forEach(el => el.oninput = (e) => {
-            const id = e.target.id;
-            if(id === 'input-total-time') settings.totalMinutes = parseInt(e.target.value) || 1;
-            if(id === 'input-exhale') settings.exhaleTime = parseInt(e.target.value) || 1;
-            if(id === 'input-inhale') settings.inhaleTime = parseInt(e.target.value) || 1;
-            if(id === 'input-hold') settings.holdTime = parseInt(e.target.value) || 1;
-            if(id === 'input-message') settings.message = e.target.value;
-            refresh();
-        });
-        
+        document.getElementById("breath-trigger").onclick = () => { if (!isMeditating) start(); else if (!isPaused) pauseMeditation(); };
+        document.getElementById("btn-resume").onclick = resumeMeditation; document.getElementById("btn-stop").onclick = () => location.reload();
+        document.getElementById("btn-sound").onclick = (e) => { e.stopPropagation(); settings.soundEnabled = !settings.soundEnabled; refresh(); };
+        document.getElementById("btn-info").onclick = (e) => { e.stopPropagation(); document.getElementById("modal-info").classList.add('active'); };
+        document.getElementById("btn-settings").onclick = (e) => { e.stopPropagation(); document.getElementById("modal-settings").classList.add('active'); };
+        document.querySelectorAll('.close-modal').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); });
+        document.querySelectorAll('.modal').forEach(modal => modal.onclick = (e) => { if (e.target === modal) { if (modal.id === 'modal-pause') resumeMeditation(); else modal.classList.remove('active'); } });
+        window.adjustValue = function(id, delta) { const input = document.getElementById(id); let val = parseInt(input.value) || 1; val += delta; if(val < 1) val = 1; input.value = val; input.dispatchEvent(new Event('input')); };
+        document.querySelectorAll('input').forEach(el => el.oninput = (e) => { const id = e.target.id; if(id === 'input-total-time') settings.totalMinutes = parseInt(e.target.value) || 1; if(id === 'input-exhale') settings.exhaleTime = parseInt(e.target.value) || 1; if(id === 'input-inhale') settings.inhaleTime = parseInt(e.target.value) || 1; if(id === 'input-hold') settings.holdTime = parseInt(e.target.value) || 1; if(id === 'input-message') settings.message = e.target.value; refresh(); });
         document.getElementById("btn-reset").onclick = () => location.reload();
+        document.getElementById("btn-copy-img").onclick = () => { const canvas = document.getElementById("share-canvas"); canvas.toBlob(b => { try { navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]); const toast = document.getElementById("toast"); toast.innerText = I18N[getCurLang()].postOk; toast.style.opacity = "1"; setTimeout(() => { toast.style.opacity = "0"; }, 3000); } catch(e){} }); };
+        document.getElementById("btn-post-x").onclick = () => { const t = I18N[getCurLang()]; const text = `${settings.totalMinutes}${t.xShareText}`; window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`, '_blank'); };
 
-        document.getElementById("btn-copy-img").onclick = () => {
-            const canvas = document.getElementById("share-canvas");
-            canvas.toBlob(b => {
-                try { 
-                    navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]); 
-                    const toast = document.getElementById("toast");
-                    toast.innerText = I18N[getLang()].postOk;
-                    toast.style.opacity = "1";
-                    setTimeout(() => { toast.style.opacity = "0"; }, 3000);
-                } catch(e){}
-            });
-        };
-
-        document.getElementById("btn-post-x").onclick = () => {
-            const t = I18N[getLang()];
-            const text = `${settings.totalMinutes}${t.xShareText}`;
-            const url = window.location.href;
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
-        };
-
+        window.speechSynthesis.onvoiceschanged = () => refresh();
         refresh(); setVisuals('reset', 0);
     </script>
 </body>
