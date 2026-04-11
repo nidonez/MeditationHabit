@@ -21,13 +21,12 @@
             font-family: 'Montserrat', 'Noto Sans JP', sans-serif;
             background: radial-gradient(circle at center, #05131a 0%, #000000 100%);
             color: #ffffff;
-            min-height: var(--app-height);
+            height: var(--app-height);
             display: flex;
             flex-direction: column;
             user-select: none;
             margin: 0;
-            overflow-x: hidden;
-            overflow-y: auto;
+            overflow: hidden; /* 画面全体のスクロールを完全に禁止 */
             -webkit-overflow-scrolling: touch;
         }
 
@@ -98,7 +97,7 @@
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            overflow-y: auto;
+            overflow-y: auto; /* モーダル内はスクロール可能 */
             padding: 2rem 1rem;
         }
         .modal.active { opacity: 1; pointer-events: auto; }
@@ -156,8 +155,7 @@
 </head>
 <body class="safe-area-inset">
 
-    <!-- アイコン内部に確実に pointer-events-none を付与し、ボタン判定を強化 -->
-    <header class="w-full max-w-lg mx-auto flex justify-between items-center p-6 relative z-50 transition-opacity duration-300" id="header-icons">
+    <header class="w-full max-w-lg mx-auto flex justify-between items-center p-6 shrink-0 relative z-50 transition-opacity duration-300" id="header-icons">
         <button id="btn-sound" class="w-12 h-12 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 shadow-sm active:scale-90 transition-all cursor-pointer touch-manipulation">
             <i id="icon-sound" class="ph ph-speaker-high text-2xl text-cyan-400 pointer-events-none"></i>
         </button>
@@ -172,22 +170,23 @@
     </header>
 
     <main class="flex-grow flex flex-col items-center justify-center w-full px-6 relative overflow-hidden">
-        <div id="breath-trigger" class="relative flex items-center justify-center w-[90vw] h-[90vw] max-w-[550px] max-h-[550px] cursor-pointer group active:opacity-95 transition-all z-10 touch-manipulation">
+        
+        <div id="breath-trigger" class="relative flex items-center justify-center w-[85vw] h-[85vw] max-w-[450px] max-h-[450px] md:max-w-[500px] md:max-h-[500px] cursor-pointer group active:opacity-95 transition-all z-10 touch-manipulation mb-8">
             <div id="visual-container" class="pointer-events-none"></div>
             
             <div class="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none text-center">
-                <span id="phase-text" class="text-[9vw] md:text-5xl font-extralight modern-text text-white mb-8">はじめる</span>
-                <div id="timer-display" style="font-family: 'Montserrat', sans-serif;" class="text-[12vw] md:text-6xl font-thin text-white/80 tracking-widest">02:00</div>
+                <span id="phase-text" class="text-[8vw] md:text-5xl font-extralight modern-text text-white mb-6">はじめる</span>
+                <div id="timer-display" style="font-family: 'Montserrat', sans-serif;" class="text-[11vw] md:text-6xl font-thin text-white/80 tracking-widest">02:00</div>
             </div>
         </div>
         
-        <div class="text-center relative z-20 pointer-events-none -mt-[4vh]">
-            <div id="custom-message-display" class="text-[8vw] md:text-4xl font-light text-white/90 modern-text pointer-events-auto cursor-pointer transition hover:text-cyan-300 touch-manipulation" onclick="document.getElementById('modal-settings').classList.add('active')">考えない</div>
+        <div class="text-center relative z-20 pointer-events-none shrink-0 pb-4">
+            <div id="custom-message-display" class="text-[7vw] md:text-3xl font-light text-white/90 modern-text pointer-events-auto cursor-pointer transition hover:text-cyan-300 touch-manipulation" onclick="document.getElementById('modal-settings').classList.add('active')">考えない</div>
             <p id="hint-text" class="text-[10px] text-gray-500 mt-3 tracking-widest pointer-events-none transition-opacity duration-300">※メッセージや時間は設定で変更できます</p>
         </div>
     </main>
 
-    <footer class="h-[12vh] w-full shrink-0"></footer>
+    <!-- 不要なフッター領域を削除してスペースを確保 -->
 
     <div id="finish-overlay">
         <div class="w-full max-w-sm text-center">
