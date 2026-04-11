@@ -2,617 +2,647 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <!-- スマホで見た時に文字が小さくなりすぎないように、またズームを制限してアプリらしく見せるための設定です -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>瞑想習慣 - Meditation Habit</title>
     
-    <!-- デザインを整えるためのツール（Tailwind CSS）とアイコン（Phosphor Icons）を読み込みます -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400&family=Noto+Sans+JP:wght@100;200;300;400&display=swap" rel="stylesheet">
+    
     <style>
-        /* Google Fontsから綺麗なフォントを読み込みます */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
-        
         :root {
-            /* スマホのブラウザのバーを除いた「本当の画面の高さ」を定義します */
             --app-height: 100dvh;
+            --magic-cyan: rgba(0, 255, 230, 0.8);
+            --magic-blue: rgba(0, 100, 255, 0.5);
         }
 
         body {
-            font-family: 'Inter', 'Noto Sans JP', sans-serif;
-            background-color: #f5f5f7;
-            color: #1d1d1f;
-            height: var(--app-height);
+            font-family: 'Montserrat', 'Noto Sans JP', sans-serif;
+            background: radial-gradient(circle at center, #05131a 0%, #000000 100%);
+            color: #ffffff;
+            min-height: var(--app-height);
             display: flex;
             flex-direction: column;
-            user-select: none; /* ユーザーが文字を選択（コピー）できないようにしてアプリ感を高めます */
+            user-select: none;
             margin: 0;
-            overflow: hidden; /* 画面が上下に揺れないようにスクロールを禁止します */
+            overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
-        /* 呼吸に合わせて伸び縮みする円のアニメーション設定です */
-        #breath-bg {
-            transition: transform 1s ease-in-out, background-color 1s;
-            transform: scale(1);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.03);
+        /* --- 魔法陣アニメーション --- */
+        #visual-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
         }
 
-        /* 背景をぼかす「すりガラス」のようなエフェクトの設定です */
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
+        .visual-layer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1) rotate(0deg);
+            opacity: 1;
         }
 
-        /* モーダル（ポップアップ画面）の表示・非表示を切り替える設定です */
+        .magic-glow {
+            width: 120%; height: 120%;
+            background: radial-gradient(circle, rgba(0, 255, 230, 0.25) 0%, rgba(0, 150, 255, 0.08) 40%, rgba(0,0,0,0) 70%);
+            filter: blur(30px);
+            border-radius: 50%;
+        }
+
+        .ring-outer { width: 100%; height: 100%; border: 1px dashed rgba(0, 255, 230, 0.4); border-radius: 50%; }
+        .ring-mid { width: 85%; height: 85%; border: 2px solid rgba(0, 200, 255, 0.3); border-radius: 50%; box-shadow: 0 0 20px rgba(0, 255, 230, 0.2); }
+        .ring-inner { width: 60%; height: 60%; border: 3px dotted rgba(255, 255, 255, 0.4); border-radius: 50%; }
+
+        .magic-geometry { width: 70%; height: 70%; }
+        .geom-square {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            border: 1px solid rgba(0, 255, 230, 0.6);
+            box-shadow: inset 0 0 15px rgba(0, 255, 230, 0.2), 0 0 15px rgba(0, 255, 230, 0.2);
+        }
+
+        .orb-layer { width: 80%; height: 80%; }
+        .orb {
+            position: absolute;
+            top: 25%; left: 25%;
+            width: 50%; height: 50%;
+            border-radius: 50%;
+            background: rgba(0, 240, 255, 0.15);
+            mix-blend-mode: screen;
+            filter: blur(2px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .magic-core {
+            width: 12%; height: 12%;
+            background: #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 50px 20px rgba(0, 255, 230, 0.9), 0 0 100px rgba(255, 255, 255, 0.5);
+        }
+
+        /* UIパーツ */
         .modal {
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
-        }
-        .modal.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        /* 瞑想が終わった時の画面全体を覆うレイヤーです */
-        #finish-overlay {
-            display: none;
             position: fixed;
             inset: 0;
-            z-index: 100;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(20px);
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
             justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            padding: 20px;
+            align-items: flex-start;
             overflow-y: auto;
+            padding: 2rem 1rem;
+        }
+        .modal.active { opacity: 1; pointer-events: auto; }
+
+        .glass-panel {
+            background: rgba(15, 22, 28, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%; max-width: 28rem;
+            border-radius: 32px; padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+        }
+
+        input, select {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            color: white !important; border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            font-family: inherit;
+        }
+
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        #finish-overlay {
+            display: none; position: fixed; inset: 0; z-index: 10000;
+            background: rgba(0, 0, 0, 0.98); backdrop-filter: blur(30px);
+            overflow-y: auto; padding: 3rem 1.5rem;
+            flex-direction: column; align-items: center; justify-content: flex-start;
         }
 
         #preview-image {
-            max-width: 100%;
-            height: auto;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            max-width: 100%; height: auto;
+            border-radius: 32px; box-shadow: 0 30px 80px rgba(0,0,0,0.9);
+            margin-bottom: 2rem;
+            margin-top: 2rem;
         }
 
-        /* 画面下にふわっと出る通知メッセージの設定です */
         #toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 999px;
-            font-size: 14px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-            z-index: 200;
-            white-space: nowrap;
+            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+            background: rgba(255,255,255,0.95); color: #000;
+            padding: 12px 24px; border-radius: 999px;
+            font-size: 14px; font-weight: 500; opacity: 0;
+            transition: opacity 0.3s; pointer-events: none; z-index: 20000;
+        }
+
+        .modern-text {
+            letter-spacing: 0.4em;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
         }
     </style>
 </head>
 <body class="safe-area-inset">
 
-    <!-- ヘッダー部分：情報ボタンと設定ボタン -->
-    <header class="w-full max-w-lg mx-auto flex justify-between items-center p-6 z-10 transition-opacity duration-500" id="header-icons">
-        <div class="flex gap-3">
-            <button id="btn-info" class="p-4 rounded-full bg-white/60 hover:bg-white shadow-sm text-gray-600 active:scale-90 transition">
-                <i class="ph ph-info text-2xl"></i>
+    <!-- アイコン内部に確実に pointer-events-none を付与し、ボタン判定を強化 -->
+    <header class="w-full max-w-lg mx-auto flex justify-between items-center p-6 relative z-50 transition-opacity duration-300" id="header-icons">
+        <button id="btn-sound" class="w-12 h-12 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 shadow-sm active:scale-90 transition-all cursor-pointer touch-manipulation">
+            <i id="icon-sound" class="ph ph-speaker-high text-2xl text-cyan-400 pointer-events-none"></i>
+        </button>
+        <div class="flex gap-4">
+            <button id="btn-info" class="w-12 h-12 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 shadow-sm active:scale-90 transition-all cursor-pointer touch-manipulation">
+                <i class="ph ph-info text-2xl text-gray-300 pointer-events-none"></i>
             </button>
-            <button id="btn-settings" class="p-4 rounded-full bg-white/60 hover:bg-white shadow-sm text-gray-600 active:scale-90 transition">
-                <i class="ph ph-sliders-horizontal text-2xl"></i>
+            <button id="btn-settings" class="w-12 h-12 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 shadow-sm active:scale-90 transition-all cursor-pointer touch-manipulation">
+                <i class="ph ph-sliders-horizontal text-2xl text-gray-300 pointer-events-none"></i>
             </button>
         </div>
     </header>
 
-    <!-- メインコンテンツ：呼吸の円とメッセージ -->
-    <main class="flex-grow flex flex-col items-center justify-center w-full px-6">
-        <!-- 円の大きさは画面幅（vw）に合わせてレスポンシブに変化します -->
-        <div id="breath-trigger" class="relative flex items-center justify-center w-[75vw] h-[75vw] max-w-[420px] max-h-[420px] cursor-pointer group active:opacity-80 transition-opacity">
-            <div id="breath-bg" class="absolute w-full h-full rounded-full bg-white border border-gray-100"></div>
+    <main class="flex-grow flex flex-col items-center justify-center w-full px-6 relative overflow-hidden">
+        <div id="breath-trigger" class="relative flex items-center justify-center w-[90vw] h-[90vw] max-w-[550px] max-h-[550px] cursor-pointer group active:opacity-95 transition-all z-10 touch-manipulation">
+            <div id="visual-container" class="pointer-events-none"></div>
+            
             <div class="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none text-center">
-                <!-- 呼吸の状態（吸う・吐くなど）を表示 -->
-                <span id="phase-text" class="text-[7vw] md:text-3xl font-light tracking-[0.2em] text-gray-800">はじめる</span>
-                <!-- 残り時間を表示 -->
-                <div id="timer-display" class="text-[5vw] md:text-2xl font-extralight text-gray-300 font-mono mt-4">02:00</div>
+                <span id="phase-text" class="text-[9vw] md:text-5xl font-extralight modern-text text-white mb-8">はじめる</span>
+                <div id="timer-display" style="font-family: 'Montserrat', sans-serif;" class="text-[12vw] md:text-6xl font-thin text-white/80 tracking-widest">02:00</div>
             </div>
         </div>
         
-        <!-- 下部のメッセージエリア -->
-        <div class="text-center mt-[8vh]">
-            <div id="custom-message-display" class="text-[8vw] md:text-4xl font-light text-gray-800 tracking-wide">考えない</div>
+        <div class="text-center relative z-20 pointer-events-none -mt-[4vh]">
+            <div id="custom-message-display" class="text-[8vw] md:text-4xl font-light text-white/90 modern-text pointer-events-auto cursor-pointer transition hover:text-cyan-300 touch-manipulation" onclick="document.getElementById('modal-settings').classList.add('active')">考えない</div>
+            <p id="hint-text" class="text-[10px] text-gray-500 mt-3 tracking-widest pointer-events-none transition-opacity duration-300">※メッセージや時間は設定で変更できます</p>
         </div>
     </main>
 
-    <!-- レイアウト調整用の空フッター -->
-    <footer class="h-[10vh] w-full"></footer>
+    <footer class="h-[12vh] w-full shrink-0"></footer>
 
-    <!-- 瞑想完了時のオーバーレイ画面 -->
     <div id="finish-overlay">
         <div class="w-full max-w-sm text-center">
-            <h2 id="finish-title" class="text-2xl font-bold mb-6 text-gray-800 tracking-tight">瞑想を完了しました</h2>
+            <h2 id="finish-title" class="text-3xl font-extralight mt-8 mb-4 text-white modern-text">瞑想を完了しました</h2>
+            <img id="preview-image" src="" alt="Share Result Image">
             
-            <div class="mb-6 px-2">
-                <img id="preview-image" src="" alt="Meditation Result">
-            </div>
-
-            <!-- 画像をコピーするボタン -->
-            <button id="btn-copy-image" class="mb-6 mx-auto py-3 px-8 bg-gray-100 text-gray-700 rounded-full text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-200 shadow-sm transition active:scale-95 border border-gray-200">
-                <i class="ph ph-copy text-lg"></i>
-                <span id="lbl-copy">画像をコピーする</span>
-            </button>
-
-            <!-- X（Twitter）に投稿するボタン -->
-            <div class="space-y-4 w-full px-4">
-                <button id="btn-post-x" class="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg transition active:scale-95 bg-black text-white">
-                    <i class="ph ph-x-logo text-xl"></i>
-                    <span id="lbl-post">Xに投稿する</span>
+            <div class="space-y-4 w-full px-4 pb-12">
+                <button id="btn-copy-img" class="w-full py-4 rounded-full font-medium flex items-center justify-center gap-3 bg-white text-black hover:bg-gray-100 transition active:scale-95 cursor-pointer touch-manipulation">
+                    <i class="ph ph-copy text-2xl pointer-events-none"></i><span>画像をコピーする</span>
                 </button>
-                <button id="btn-reset" class="w-full bg-gray-100 text-gray-500 py-3 rounded-2xl font-medium transition active:scale-95">完了して戻る</button>
+                <button id="btn-post-x" class="w-full py-4 rounded-full font-medium flex items-center justify-center gap-3 bg-black text-white border border-gray-700 hover:bg-gray-900 transition active:scale-95 cursor-pointer touch-manipulation">
+                    <i class="ph ph-x-logo text-2xl pointer-events-none"></i><span>Xに投稿する</span>
+                </button>
+                <button id="btn-reset" class="w-full bg-white/10 text-white/80 py-4 mt-6 rounded-full font-light transition active:scale-95 hover:bg-white/20 cursor-pointer touch-manipulation">完了して戻る</button>
             </div>
-            
-            <div id="share-note" class="mt-8 text-[10px] text-gray-400 leading-relaxed px-6"></div>
         </div>
     </div>
 
-    <!-- UIパーツと画像生成用キャンバス -->
+    <div id="modal-pause" class="modal">
+        <div class="glass-panel my-auto text-center w-full">
+            <h2 class="text-2xl mb-8 font-light tracking-widest text-white">一時停止中</h2>
+            <button id="btn-resume" class="w-full py-4 mb-4 rounded-full bg-white text-black font-medium transition active:scale-95 cursor-pointer touch-manipulation">再開する</button>
+            <button id="btn-stop" class="w-full py-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition active:scale-95 cursor-pointer touch-manipulation">やめる</button>
+        </div>
+    </div>
+
+    <div id="modal-info" class="modal">
+        <div class="glass-panel my-auto w-full">
+            <div class="flex justify-end mb-4">
+                <button class="close-modal w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-gray-400 hover:text-white cursor-pointer touch-manipulation">
+                    <i class="ph ph-x text-xl pointer-events-none"></i>
+                </button>
+            </div>
+            
+            <div class="text-gray-300 leading-relaxed font-extralight text-sm">
+                <section>
+                    <h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest">なぜ「吐く」から始まるのか？</h3>
+                    <p class="m-0">肺の中の古い空気を出し切ることで、自然と新鮮な空気が入ります。「手放すことが先」という教えです。</p>
+                    <p class="text-[10px] italic text-right m-0">参照：『新版 呼吸の本』 谷川 俊太郎 (著), 加藤 俊朗 (著)</p>
+                </section>
+                
+                <section class="mt-4">
+                    <h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest italic">「3秒吸って、2秒溜めて、15秒吐く」</h3>
+                    <p class="m-0">現代人は呼吸が浅くはやくなっている。深い呼吸の力を取り戻す時、からだは疲れにくく集中力は飛躍的に向上する。そして心に中心軸が生まれる－かつて日本人が持っていた「呼吸力」を取り戻す感動の一冊</p>
+                    <p class="text-[10px] italic text-right m-0">参照：『呼吸入門』 齋藤 孝</p>
+                </section>
+                
+                <section class="mt-4">
+                    <h3 class="font-normal text-white mb-2 border-b border-white/10 pb-1 tracking-widest">瞑想の効用・メリット</h3>
+                    <ul class="list-disc pl-6 m-0">
+                        <li>ストレスや不安を和らげ、心が落ち着く</li>
+                        <li>集中力や記憶力が向上し、頭がスッキリする</li>
+                        <li>自律神経が整い、睡眠の質が改善される</li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <div id="toast"></div>
     <canvas id="share-canvas" width="1200" height="630" style="display:none;"></canvas>
 
-    <!-- 設定画面 -->
-    <div id="modal-settings" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/20 backdrop-blur-sm">
-        <div class="glass-panel w-full max-w-md rounded-3xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div class="flex justify-between items-center mb-6">
-                <h2 id="modal-settings-title" class="text-2xl font-medium text-gray-800">設定</h2>
-                <button class="close-modal p-2 text-gray-500 hover:text-gray-800"><i class="ph ph-x text-2xl"></i></button>
+    <div id="modal-settings" class="modal">
+        <div class="glass-panel my-auto w-full">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-light text-white tracking-[0.3em]">設定</h2>
+                <button class="close-modal w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-gray-400 hover:text-white cursor-pointer touch-manipulation">
+                    <i class="ph ph-x text-xl pointer-events-none"></i>
+                </button>
             </div>
-            <div class="space-y-6">
-                <!-- 言語 -->
+            <div class="space-y-8">
                 <div>
-                    <label id="lbl-lang-setting" class="block text-xs text-gray-500 mb-2 font-bold">表示言語 (Language)</label>
-                    <select id="input-lang" class="w-full bg-white border border-gray-200 rounded-xl p-4 outline-none appearance-none">
-                        <option value="auto">Auto (Detect)</option>
-                        <option value="ja">日本語</option>
-                        <option value="en">English</option>
-                    </select>
-                </div>
-
-                <!-- 振動 -->
-                <div class="flex items-center justify-between p-1">
-                    <label id="lbl-vibrate-setting" class="text-xs text-gray-500 font-bold">呼吸の切り替わりで振動する</label>
-                    <button id="toggle-vibrate" class="relative inline-flex h-7 w-12 items-center rounded-full bg-gray-200 transition-colors">
-                        <span id="vibrate-knob" class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform translate-x-1 shadow-sm"></span>
-                    </button>
-                </div>
-
-                <!-- 時間設定 -->
-                <div class="border-t border-gray-100 pt-4">
-                    <label id="lbl-total-time" class="block text-xs text-gray-500 mb-2">全体の瞑想時間 (分)</label>
-                    <input type="number" id="input-total-time" class="w-full bg-white border border-gray-200 rounded-xl p-4 outline-none">
-                </div>
-                
-                <!-- 秒数設定 -->
-                <div class="grid grid-cols-3 gap-3">
-                    <div>
-                        <label id="lbl-exhale" class="block text-[10px] text-gray-500 mb-1 text-center">吐く(秒)</label>
-                        <input type="number" id="input-exhale" class="w-full border rounded-xl p-3 text-center outline-none">
-                    </div>
-                    <div>
-                        <label id="lbl-inhale" class="block text-[10px] text-gray-500 mb-1 text-center">吸う(秒)</label>
-                        <input type="number" id="input-inhale" class="w-full border rounded-xl p-3 text-center outline-none">
-                    </div>
-                    <div>
-                        <label id="lbl-hold" class="block text-[10px] text-gray-500 mb-1 text-center">ためる(秒)</label>
-                        <input type="number" id="input-hold" class="w-full border rounded-xl p-3 text-center outline-none">
+                    <label class="block text-[11px] text-gray-500 mb-4 tracking-widest uppercase">全体の瞑想時間 (分)</label>
+                    <div class="flex items-center justify-between bg-white/5 rounded-2xl p-2 border border-white/20">
+                        <button type="button" class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-total-time', -1)">
+                            <i class="ph ph-minus text-xl pointer-events-none"></i>
+                        </button>
+                        <input type="number" id="input-total-time" class="w-20 text-center outline-none font-light bg-transparent text-white text-xl border-none !border-transparent !bg-transparent" style="border:none !important;">
+                        <button type="button" class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-total-time', 1)">
+                            <i class="ph ph-plus text-xl pointer-events-none"></i>
+                        </button>
                     </div>
                 </div>
-
-                <!-- メッセージ -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-[10px] text-gray-500 mb-2 text-center">吐く(秒)</label>
+                        <div class="flex flex-col items-center bg-white/5 rounded-xl p-1 border border-white/20">
+                            <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-exhale', 1)"><i class="ph ph-caret-up pointer-events-none"></i></button>
+                            <input type="number" id="input-exhale" class="w-full py-2 text-center outline-none font-light bg-transparent text-white border-none !border-transparent !bg-transparent" style="border:none !important;">
+                            <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-exhale', -1)"><i class="ph ph-caret-down pointer-events-none"></i></button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-500 mb-2 text-center">吸う(秒)</label>
+                        <div class="flex flex-col items-center bg-white/5 rounded-xl p-1 border border-white/20">
+                            <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-inhale', 1)"><i class="ph ph-caret-up pointer-events-none"></i></button>
+                            <input type="number" id="input-inhale" class="w-full py-2 text-center outline-none font-light bg-transparent text-white border-none !border-transparent !bg-transparent" style="border:none !important;">
+                            <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-inhale', -1)"><i class="ph ph-caret-down pointer-events-none"></i></button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-500 mb-2 text-center">ためる(秒)</label>
+                        <div class="flex flex-col items-center bg-white/5 rounded-xl p-1 border border-white/20">
+                            <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-hold', 1)"><i class="ph ph-caret-up pointer-events-none"></i></button>
+                            <input type="number" id="input-hold" class="w-full py-2 text-center outline-none font-light bg-transparent text-white border-none !border-transparent !bg-transparent" style="border:none !important;">
+                            <button type="button" class="w-full h-8 rounded-lg bg-white/10 flex items-center justify-center text-white active:scale-95 transition cursor-pointer touch-manipulation" onclick="adjustValue('input-hold', -1)"><i class="ph ph-caret-down pointer-events-none"></i></button>
+                        </div>
+                    </div>
+                </div>
                 <div>
-                    <label id="lbl-message-setting" class="block text-xs text-gray-500 mb-2">表示メッセージ (自由に変更できます)</label>
-                    <input type="text" id="input-message" maxlength="20" class="w-full bg-white border border-gray-200 rounded-xl p-4 outline-none">
+                    <label class="block text-[11px] text-gray-500 mb-4 tracking-widest uppercase">メッセージ（※自由に変更できます）</label>
+                    <input type="text" id="input-message" maxlength="20" class="w-full rounded-2xl p-4 outline-none text-center">
                 </div>
-            </div>
-            <button id="btn-save-settings" class="w-full mt-8 bg-gray-800 text-white py-4 rounded-2xl font-bold">設定を保存</button>
-        </div>
-    </div>
-
-    <!-- メソッドの情報画面 -->
-    <div id="modal-info" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/20 backdrop-blur-sm">
-        <div class="glass-panel w-full max-w-lg rounded-3xl p-8 max-h-[85vh] overflow-y-auto shadow-xl">
-            <div class="flex justify-between items-center mb-6">
-                <h2 id="modal-info-title" class="text-xl font-bold text-gray-800 tracking-tight">呼吸のメソッド</h2>
-                <button class="close-modal p-2 text-gray-400 hover:text-gray-800"><i class="ph ph-x text-2xl"></i></button>
-            </div>
-            <div class="space-y-8 text-gray-700 leading-relaxed font-light">
-                <section>
-                    <h3 id="info-q1" class="font-bold text-gray-900 mb-3 border-b border-gray-100 pb-2">なぜ「吐く」から始まるのか？</h3>
-                    <p id="info-a1" class="text-sm"></p>
-                    <p id="info-ref1" class="text-[10px] text-gray-400 mt-2 italic text-right"></p>
-                </section>
-                <section>
-                    <h3 id="info-q2" class="font-bold text-gray-900 mb-3 border-b border-gray-100 pb-2">3：2：15のリズムについて</h3>
-                    <div class="text-sm space-y-3">
-                        <p id="info-a2-1" class="text-gray-900 font-medium italic"></p>
-                        <p id="info-a2-2"></p>
-                        <p id="info-a2-3"></p>
-                    </div>
-                    <p id="info-ref2" class="text-[10px] text-gray-400 mt-4 italic text-right"></p>
-                </section>
             </div>
         </div>
     </div>
 
     <script>
-        /**
-         * ここからJavaScript（アプリの動き）です。
-         * プログラミングの学習用に、標準的でわかりやすい書き方にしています。
-         */
-
-        // --- 1. アプリの状態を保存する変数 ---
-        // これらの変数の値を書き換えることで、アプリの動きをコントロールします。
-        let isMeditating = false; // 今瞑想中かどうか
-        let remainingSeconds = 120; // 残り秒数
-        let timerInterval = null; // カウントダウン用のタイマー
-        let breathTimeout = null; // 呼吸の切り替わり用のタイマー
-
-        // 設定データ
-        let settings = {
+        // --- 1. 基本設定と保存データの読み込み ---
+        const STORAGE_KEY = "meditation_habit_settings_v8";
+        const DEFAULT_SETTINGS = {
             totalMinutes: 2,
             exhaleTime: 15,
             inhaleTime: 3,
             holdTime: 2,
             message: "考えない",
-            lang: 'auto',
-            vibrate: true
+            soundEnabled: true
         };
 
-        // 多言語対応用の辞書
+        let settings = { ...DEFAULT_SETTINGS };
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try { settings = { ...settings, ...JSON.parse(saved) }; } catch(e) {}
+        }
+
+        let isMeditating = false;
+        let isPaused = false;
+        let currentPhaseStr = '';
+        let remainingSeconds = settings.totalMinutes * 60;
+        let timerInterval = null;
+        let breathTimeout = null;
+
         const I18N = {
             ja: {
-                appTitle: "瞑想習慣", start: "はじめる", inhale: "吸う", hold: "ためる", exhale: "息をはく",
-                defaultMsg: "考えない", finished: "瞑想を完了しました",
-                copyBtn: "画像をコピーする", postBtn: "Xに投稿する", resetBtn: "完了して戻る",
-                toastCopyOk: "画像をコピーしました！貼り付けて投稿してください。",
-                toastCopyNg: "コピー非対応です。画像を長押し保存してください。",
-                toastPreview: "制限により保存しました。貼り付け可能です。",
-                shareNote: "※画像をコピーした後、Xで貼り付け（ペースト）してください。",
-                infoTitle: "呼吸のメソッド", infoQ1: "なぜ「吐く」から始まるのか？",
-                infoA1: "肺の中の古い空気を出し切ることで、自然と新鮮な空気が入ります。「手放すことが先」という教えです。",
-                infoRef1: "参照：『新版 呼吸の本』 加藤 俊朗・谷川 俊太郎",
-                infoQ2: "3：2：15のリズムについて",
-                infoA2_1: "3秒吸って、2秒溜めて、15秒で吐く－これで、力が劇的に高まる",
-                infoA2_2: "深い呼吸を取り戻す時、疲れにくく集中力は飛躍的に向上します。",
-                infoA2_3: "心に中心軸が生まれ、本来の自分を取り戻すことができます。",
-                infoRef2: "参照：『呼吸入門』 齋藤 孝 (角川書店)",
-                settingTitle: "設定", lblLang: "表示言語 (Language)", lblVibrate: "呼吸の切り替わりで振動する",
-                lblTotalTime: "全体の瞑想時間 (分)", lblExhale: "吐く(秒)", lblInhale: "吸う(秒)", lblHold: "ためる(秒)",
-                lblMessage: "表示メッセージ (自由に変更できます)", btnSaveSettings: "設定を保存",
-                shareCanvasTitle: "瞑想習慣", shareCanvasMin: "minutes",
-                shareCanvasSub: "心を整え、自分に戻る時間。", shareCanvasApp: "Meditation Habit App",
-                xShareText: "分間の瞑想を完了しました。心を整えて、リラックス。集中。 #瞑想 #瞑想習慣\n"
+                start: "はじめる", inhale: "吸う", hold: "ためる", exhale: "息をはく",
+                inhaleVoice: "すって", holdVoice: "ためて", exhaleVoice: "はいて", 
+                shareText: "心を整え、新たな一歩を。", 
+                postOk: "画像をコピーしました！X等に貼り付けてください。",
+                xShareText: "分間の瞑想を完了しました。心を整え、新たな一歩を。 #瞑想 #瞑想習慣 #声で瞑想"
             },
             en: {
-                appTitle: "Meditation Habit", start: "Start", inhale: "Inhale", hold: "Hold", exhale: "Exhale",
-                defaultMsg: "Clear your mind", finished: "Meditation Completed",
-                copyBtn: "Copy Image", postBtn: "Post on X", resetBtn: "Done",
-                toastCopyOk: "Image copied! Please paste it on X.",
-                toastCopyNg: "Copy not supported. Long press to save.",
-                toastPreview: "Image saved. Ready to paste.",
-                shareNote: "* After copying, please paste the image in your X post.",
-                infoTitle: "Breathing Method", infoQ1: "Why start with an exhale?",
-                infoA1: "By emptying old air, space is created for fresh air. It teaches us to 'let go first'.",
-                infoRef1: "Ref: 'The Book of Breath' by T. Kato & S. Tanikawa",
-                infoQ2: "The 3:2:15 Rhythm",
-                infoA2_1: "Inhale 3s, hold 2s, exhale 15s - boosts your energy.",
-                infoA2_2: "Restoring deep breathing reduces fatigue and boosts focus.",
-                infoA2_3: "It creates a mental axis, reclaiming your true self.",
-                infoRef2: "Ref: 'Introduction to Breathing' by T. Saito",
-                settingTitle: "Settings", lblLang: "Language", lblVibrate: "Vibrate on transition",
-                lblTotalTime: "Total Time (min)", lblExhale: "Exhale (sec)", lblInhale: "Inhale (sec)", lblHold: "Hold (sec)",
-                lblMessage: "Display Message (Customizable)", btnSaveSettings: "Save Settings",
-                shareCanvasTitle: "Meditation Habit", shareCanvasMin: "minutes",
-                shareCanvasSub: "Time to reset and reconnect.", shareCanvasApp: "Meditation Habit App",
-                xShareText: " minutes of meditation completed. Mind cleared and ready. #Meditation #MeditationHabit\n"
+                start: "Start", inhale: "Inhale", hold: "Hold", exhale: "Exhale",
+                inhaleVoice: "Inhale", holdVoice: "Hold", exhaleVoice: "Exhale",
+                shareText: "Align your heart, take a new step.",
+                postOk: "Image copied!",
+                xShareText: " minutes of meditation completed. Align your heart, take a new step. #Meditation #MeditationHabit #VoiceMeditation"
             }
         };
 
-        // --- 2. 便利な機能（関数） ---
+        // --- 2. 魔法陣DOM生成 ---
+        const visualContainer = document.getElementById("visual-container");
+        visualContainer.innerHTML = `
+            <div class="visual-layer magic-glow"></div>
+            <div class="visual-layer ring-outer"></div>
+            <div class="visual-layer ring-mid"></div>
+            <div class="visual-layer ring-inner"></div>
+            <div class="visual-layer magic-geometry">
+                <div class="geom-square" style="transform:rotate(0deg)"></div>
+                <div class="geom-square" style="transform:rotate(30deg)"></div>
+                <div class="geom-square" style="transform:rotate(60deg)"></div>
+            </div>
+            <div class="visual-layer orb-layer">
+                ${Array.from({length:6}).map((_,i) => `<div class="orb" style="transform: rotate(${i*60}deg) translateY(-45%)"></div>`).join('')}
+            </div>
+            <div class="visual-layer magic-core"></div>
+        `;
 
-        // 今使うべき言語を取得します
-        function getCurrentLanguage() {
-            if (settings.lang !== 'auto') return settings.lang;
-            return (navigator.language || '').startsWith('ja') ? 'ja' : 'en';
-        }
+        let curRings = [0, 0, 0];
+        let curGeom = 0;
+        let curOrbLayer = 0;
 
-        // 画面上の文字を現在の言語に書き換えます
-        function applyLanguage() {
-            const currentLang = getCurrentLanguage();
-            const t = I18N[currentLang];
-            const otherT = I18N[currentLang === 'ja' ? 'en' : 'ja'];
+        function setVisuals(phase, duration) {
+            let t = `all ${duration}s linear`, op, sc, orbT;
 
-            // ユーザーがメッセージをいじってなければ、言語に合わせて「考えない」の文字も翻訳します
-            if (settings.message === otherT.defaultMsg) {
-                settings.message = t.defaultMsg;
+            if (phase === 'exhale') {
+                op = 0; sc = 0.1; orbT = 0;
+                curRings[0] += 180; curRings[1] -= 180; curRings[2] += 180; curGeom -= 180; curOrbLayer += 90;
+            } else if (phase === 'inhale') {
+                op = 1; sc = 1.0; orbT = 45;
+                curRings[0] += 120; curRings[1] -= 90; curRings[2] += 120; curGeom -= 90; curOrbLayer += 60;
+            } else if (phase === 'hold') {
+                op = 1; sc = 1.1; orbT = 50;
+                curRings[0] += 30; curRings[1] -= 20; curRings[2] += 30; curGeom -= 20; curOrbLayer += 15;
+            } else {
+                t = "none"; op = 1; sc = 1.0; orbT = 45; curRings = [0,0,0]; curGeom = 0; curOrbLayer = 0;
             }
 
-            document.title = t.appTitle;
-            if (!isMeditating) document.getElementById("phase-text").innerText = t.start;
+            const apply = (sel, s, r) => {
+                const el = document.querySelector(sel);
+                if(el) { el.style.transition = t; el.style.transform = `translate(-50%, -50%) scale(${s}) rotate(${r}deg)`; el.style.opacity = op; }
+            };
+
+            apply('.magic-glow', sc*1.2, 0); apply('.magic-core', sc, 0);
+            apply('.ring-outer', sc, curRings[0]); apply('.ring-mid', sc, curRings[1]); apply('.ring-inner', sc, curRings[2]);
+            apply('.magic-geometry', sc, curGeom); apply('.orb-layer', sc, curOrbLayer);
             
-            document.getElementById("finish-title").innerText = t.finished;
-            document.getElementById("lbl-copy").innerText = t.copyBtn;
-            document.getElementById("lbl-post").innerText = t.postBtn;
-            document.getElementById("btn-reset").innerText = t.resetBtn;
-            document.getElementById("share-note").innerText = t.shareNote;
-            
-            document.getElementById("modal-info-title").innerText = t.infoTitle;
-            document.getElementById("info-q1").innerText = t.infoQ1;
-            document.getElementById("info-a1").innerText = t.infoA1;
-            document.getElementById("info-ref1").innerText = t.infoRef1;
-            document.getElementById('info-q2').innerText = t.infoQ2;
-            document.getElementById('info-a2-1').innerText = t.infoA2_1;
-            document.getElementById('info-a2-2').innerText = t.infoA2_2;
-            document.getElementById('info-a2-3').innerText = t.infoA2_3;
-            document.getElementById('info-ref2').innerText = t.infoRef2;
-            
-            document.getElementById("modal-settings-title").innerText = t.settingTitle;
-            document.getElementById("lbl-lang-setting").innerText = t.lblLang;
-            document.getElementById("lbl-vibrate-setting").innerText = t.lblVibrate;
-            document.getElementById("lbl-total-time").innerText = t.lblTotalTime;
-            document.getElementById("lbl-exhale").innerText = t.lblExhale;
-            document.getElementById("lbl-inhale").innerText = t.lblInhale;
-            document.getElementById("lbl-hold").innerText = t.lblHold;
-            document.getElementById("lbl-message-setting").innerText = t.lblMessage;
-            document.getElementById("btn-save-settings").innerText = t.btnSaveSettings;
-            
-            document.getElementById("custom-message-display").innerText = settings.message;
-            syncSettingsToForm();
+            document.querySelectorAll('.orb').forEach((o, i) => {
+                o.style.transition = t; o.style.transform = `rotate(${i*60}deg) translateY(-${orbT}%)`; o.style.opacity = op;
+            });
         }
 
-        // 設定画面の入力欄に、現在の設定値を反映させます
-        function syncSettingsToForm() {
-            document.getElementById("input-lang").value = settings.lang;
+        // --- 3. サウンド ---
+        let audioCtx = null;
+        function playBreathSound(phase, duration) {
+            if (!settings.soundEnabled || phase === 'hold') return;
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const now = audioCtx.currentTime;
+            const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+            const noise = audioCtx.createBufferSource(); noise.buffer = buffer; noise.loop = true;
+            const noiseFilter = audioCtx.createBiquadFilter(); noiseFilter.type = 'lowpass';
+            const noiseGain = audioCtx.createGain();
+            noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination);
+            const harpGain = audioCtx.createGain(); harpGain.connect(audioCtx.destination);
+            const freqs = phase === 'inhale' ? [440, 554, 659] : [392, 329, 261];
+
+            if (phase === 'inhale') {
+                noiseFilter.frequency.setValueAtTime(200, now);
+                noiseFilter.frequency.exponentialRampToValueAtTime(800, now + duration);
+                noiseGain.gain.setValueAtTime(0, now);
+                noiseGain.gain.linearRampToValueAtTime(0.06, now + 0.5);
+                noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + duration + 4.0);
+            } else {
+                noiseFilter.frequency.setValueAtTime(800, now);
+                noiseFilter.frequency.exponentialRampToValueAtTime(150, now + duration);
+                noiseGain.gain.setValueAtTime(0.06, now);
+                noiseGain.gain.linearRampToValueAtTime(0, now + duration);
+            }
+            noise.start(now); noise.stop(now + duration + 4.0);
+
+            freqs.forEach((f, i) => {
+                const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(f, now + i * 0.1);
+                osc.connect(g); g.connect(harpGain);
+                g.gain.setValueAtTime(0, now + i * 0.1);
+                g.gain.linearRampToValueAtTime(0.05, now + i * 0.1 + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.1 + 4.0);
+                osc.start(now + i * 0.1); osc.stop(now + i * 0.1 + 4.0);
+            });
+        }
+
+        function speak(text) {
+            if (!settings.soundEnabled || !window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = (navigator.language.startsWith('ja') ? 'ja-JP' : 'en-US');
+            window.speechSynthesis.speak(u);
+        }
+
+        // --- 4. 実行ロジック ---
+        function getLang() { return navigator.language.startsWith('ja') ? 'ja' : 'en'; }
+
+        function runLoop(phase) {
+            if (!isMeditating || isPaused) return;
+            currentPhaseStr = phase;
+            const t = I18N[getLang()];
+            const txt = document.getElementById("phase-text");
+
+            if (phase === 'exhale') {
+                txt.innerText = t.exhale; speak(t.exhaleVoice);
+                setTimeout(() => { if (isMeditating && !isPaused) playBreathSound('exhale', settings.exhaleTime); }, 1500);
+                setVisuals('exhale', settings.exhaleTime);
+                breathTimeout = setTimeout(() => { if (!isPaused) runLoop('inhale'); }, settings.exhaleTime * 1000);
+            } else if (phase === 'inhale') {
+                txt.innerText = t.inhale; speak(t.inhaleVoice);
+                setTimeout(() => { if (isMeditating && !isPaused) playBreathSound('inhale', settings.inhaleTime); }, 1500);
+                setVisuals('inhale', settings.inhaleTime);
+                breathTimeout = setTimeout(() => { if (!isPaused) runLoop('hold'); }, settings.inhaleTime * 1000);
+            } else {
+                txt.innerText = t.hold; speak(t.holdVoice);
+                setVisuals('hold', settings.holdTime);
+                breathTimeout = setTimeout(() => { if (!isPaused) runLoop('exhale'); }, settings.holdTime * 1000);
+            }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                remainingSeconds--;
+                const m = Math.floor(remainingSeconds/60).toString().padStart(2,'0'), s = (remainingSeconds%60).toString().padStart(2,'0');
+                document.getElementById("timer-display").innerText = `${m}:${s}`;
+                if (remainingSeconds <= 0) finalize();
+            }, 1000);
+        }
+
+        function start() {
+            isMeditating = true; isPaused = false;
+            document.getElementById("header-icons").style.opacity = "0";
+            document.getElementById("header-icons").style.pointerEvents = "none";
+            document.getElementById("hint-text").style.opacity = "0";
+            remainingSeconds = settings.totalMinutes * 60;
+            setVisuals('reset', 0);
+            document.getElementById('visual-container').offsetHeight;
+            runLoop('exhale');
+            startTimer();
+        }
+
+        function pauseMeditation() {
+            isPaused = true; clearInterval(timerInterval); clearTimeout(breathTimeout);
+            if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+            document.getElementById("modal-pause").classList.add('active');
+        }
+
+        function resumeMeditation() {
+            isPaused = false; document.getElementById("modal-pause").classList.remove('active');
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            startTimer(); runLoop(currentPhaseStr);
+        }
+
+        function finalize() {
+            isMeditating = false; clearInterval(timerInterval); clearTimeout(breathTimeout);
+            document.getElementById("header-icons").style.opacity = "1";
+            document.getElementById("header-icons").style.pointerEvents = "auto";
+            document.getElementById("hint-text").style.opacity = "1";
+            drawResult().then(() => { document.getElementById("finish-overlay").style.display = 'flex'; });
+        }
+
+        async function drawResult() {
+            const canvas = document.getElementById("share-canvas"), ctx = canvas.getContext('2d'), hr = new Date().getHours();
+            const t = I18N[getLang()];
+            const grads = { morning: ["#e0f2f1", "#80cbc4"], noon: ["#e1f5fe", "#81d4fa"], evening: ["#ffe0b2", "#ffb74d"], night: ["#040b10", "#102027"] };
+            const timeKey = hr >= 5 && hr < 11 ? 'morning' : hr < 17 ? 'noon' : hr < 19 ? 'evening' : 'night';
+            const [c1, c2] = grads[timeKey], g = ctx.createLinearGradient(0,0,0,630); g.addColorStop(0, c1); g.addColorStop(1, c2);
+            ctx.fillStyle = g; ctx.fillRect(0,0,1200,630);
+            
+            ctx.save(); ctx.translate(350, 420); 
+            ctx.fillStyle = timeKey === 'night' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)';
+            ctx.shadowBlur = 40; ctx.shadowColor = timeKey === 'night' ? 'rgba(0, 255, 230, 0.4)' : 'rgba(255,255,255,0.8)';
+            
+            function drawPetal(sc, rot) {
+                ctx.save(); ctx.rotate(rot); ctx.scale(sc * 2.0, sc * 2.0); 
+                ctx.beginPath(); ctx.moveTo(0,0);
+                ctx.bezierCurveTo(45,-50,35,-130,0,-180); ctx.bezierCurveTo(-35,-130,-45,-50,0,0);
+                ctx.fill(); ctx.restore();
+            }
+            drawPetal(0.7, -Math.PI/2.5); drawPetal(0.7, Math.PI/2.5);
+            drawPetal(0.85, -Math.PI/3.5); drawPetal(0.85, Math.PI/3.5);
+            drawPetal(0.95, -Math.PI/6); drawPetal(0.95, Math.PI/6);
+            drawPetal(1.0, 0);
+
+            ctx.beginPath(); ctx.moveTo(0,10);
+            ctx.quadraticCurveTo(120,10,200,-50); ctx.quadraticCurveTo(140,40,0,40);
+            ctx.quadraticCurveTo(-140,40,-200,-50); ctx.quadraticCurveTo(-120,10,0,10);
+            ctx.fill(); ctx.restore();
+            
+            ctx.textAlign = 'left'; ctx.fillStyle = timeKey === 'night' ? '#fff' : '#1d1d1f';
+            ctx.font = "200 160px 'Montserrat'"; ctx.fillText(String(settings.totalMinutes).padStart(2,'0'), 700, 320);
+            ctx.font = "300 24px 'Montserrat'"; ctx.fillText("M I N U T E S", 715, 380);
+            ctx.font = "200 36px 'Noto Sans JP'"; ctx.fillText(t.shareText, 715, 480);
+            document.getElementById("preview-image").src = canvas.toDataURL();
+        }
+
+        function refresh() {
             document.getElementById("input-total-time").value = settings.totalMinutes;
             document.getElementById("input-exhale").value = settings.exhaleTime;
             document.getElementById("input-inhale").value = settings.inhaleTime;
             document.getElementById("input-hold").value = settings.holdTime;
             document.getElementById("input-message").value = settings.message;
-            
-            // 振動スイッチの見た目を更新
-            const vBtn = document.getElementById("toggle-vibrate");
-            const vKnob = document.getElementById("vibrate-knob");
-            vBtn.className = `relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${settings.vibrate ? 'bg-blue-500' : 'bg-gray-200'}`;
-            vKnob.style.transform = `translateX(${settings.vibrate ? '26px' : '4px'})`;
+            document.getElementById("timer-display").innerText = `${String(settings.totalMinutes).padStart(2,'0')}:00`;
+            document.getElementById("custom-message-display").innerText = settings.message;
+            document.getElementById("phase-text").innerText = I18N[getLang()].start;
+            const icon = document.getElementById("icon-sound");
+            icon.className = settings.soundEnabled ? "ph ph-speaker-high text-2xl text-cyan-400" : "ph ph-speaker-slash text-2xl";
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
         }
 
-        // スマホを振動させます（Androidのみ）
-        function triggerVibration(mode) {
-            if (!settings.vibrate || !navigator.vibrate) return;
-            if (mode === 'step') navigator.vibrate(60); // 合間：短い
-            else if (mode === 'finish') navigator.vibrate([100, 80, 100, 150, 400]); // 終了：トントン、トーン
-        }
-
-        // --- 3. アプリのメインロジック ---
-
-        // 呼吸のサイクルを回します（再帰呼び出しという手法を使っています）
-        function runBreathCycle(phase) {
-            if (!isMeditating) return;
-            const t = I18N[getCurrentLanguage()];
-            triggerVibration('step');
-
-            const breathBg = document.getElementById("breath-bg");
-            const phaseText = document.getElementById("phase-text");
-
-            if (phase === 'exhale') {
-                phaseText.innerText = t.exhale;
-                breathBg.style.transitionDuration = `${settings.exhaleTime}s`;
-                breathBg.style.transform = 'scale(0.35)'; // 円を小さくする
-                breathTimeout = setTimeout(() => runBreathCycle('inhale'), settings.exhaleTime * 1000);
-            } else if (phase === 'inhale') {
-                phaseText.innerText = t.inhale;
-                breathBg.style.transitionDuration = `${settings.inhaleTime}s`;
-                breathBg.style.transform = 'scale(1)'; // 円を大きくする
-                breathTimeout = setTimeout(() => runBreathCycle('hold'), settings.inhaleTime * 1000);
-            } else if (phase === 'hold') {
-                phaseText.innerText = t.hold;
-                breathBg.style.transitionDuration = `${settings.holdTime}s`;
-                breathBg.style.transform = 'scale(1)'; // 維持する
-                breathTimeout = setTimeout(() => runBreathCycle('exhale'), settings.holdTime * 1000);
-            }
-        }
-
-        // 瞑想をスタートします
-        function startMeditation() {
-            isMeditating = true;
-            document.getElementById("header-icons").style.opacity = "0"; // ヘッダーを隠す
-            document.getElementById("header-icons").style.pointerEvents = "none";
-            
-            remainingSeconds = settings.totalMinutes * 60;
-            const timerDisplay = document.getElementById("timer-display");
-
-            // 1秒ごとにカウントダウンするタイマーをセット
-            timerInterval = setInterval(() => {
-                remainingSeconds--;
-                const m = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
-                const s = (remainingSeconds % 60).toString().padStart(2, '0');
-                timerDisplay.innerText = `${m}:${s}`;
-
-                if (remainingSeconds <= 0) finishMeditation();
-            }, 1000);
-
-            runBreathCycle('exhale'); // 呼吸アニメーション開始
-        }
-
-        // 瞑想を終了します
-        function finishMeditation() {
-            isMeditating = false;
-            clearInterval(timerInterval);
-            clearTimeout(breathTimeout);
-            triggerVibration('finish');
-            
-            // 結果画像を生成してオーバーレイを表示
-            generateResultImage().then(() => {
-                document.getElementById("finish-overlay").style.display = 'flex';
-            });
-        }
-
-        // SNSシェア用の画像をプログラムで描きます（Canvas API）
-        async function generateResultImage() {
-            const currentLang = getCurrentLanguage();
-            const t = I18N[currentLang];
-            const canvas = document.getElementById("share-canvas");
-            const ctx = canvas.getContext('2d');
-            const hour = new Date().getHours();
-            
-            // 時間帯によって背景色を変えます
-            let gradStart = "#0F2027", gradEnd = "#2C5364"; // 夜
-            if (hour >= 5 && hour < 11) { gradStart = "#FF8C00"; gradEnd = "#F8FFAE"; } // 朝
-            else if (hour >= 11 && hour < 17) { gradStart = "#56ab2f"; gradEnd = "#a8e063"; } // 昼
-            else if (hour >= 17 && hour < 19) { gradStart = "#ee0979"; gradEnd = "#ff6a00"; } // 夕方
-            
-            // グラデーションを作成
-            const grad = ctx.createLinearGradient(0, 0, 0, 630);
-            grad.addColorStop(0, gradStart);
-            grad.addColorStop(1, gradEnd);
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, 1200, 630);
-
-            // 文字を描く
-            ctx.fillStyle = "white";
-            ctx.textAlign = "center";
-            ctx.shadowColor = "rgba(0,0,0,0.2)";
-            ctx.shadowBlur = 10;
-            
-            ctx.font = "bold 50px 'Noto Sans JP', sans-serif"; 
-            ctx.fillText(t.shareCanvasTitle, 600, 150);
-            
-            ctx.font = "bold 240px 'Inter', sans-serif"; 
-            ctx.fillText(settings.totalMinutes, 600, 390);
-            
-            ctx.font = "bold 65px 'Noto Sans JP', sans-serif"; 
-            ctx.fillText(t.shareCanvasMin, 600, 500);
-            
-            ctx.font = "35px 'Noto Sans JP', sans-serif"; 
-            ctx.fillText(t.shareCanvasSub, 600, 580);
-
-            // 生成した画像をimg要素にセットします
-            document.getElementById("preview-image").src = canvas.toDataURL('image/png');
-        }
-
-        // --- 4. ボタン操作などのイベント設定 ---
-
-        // 真ん中の円をクリックした時
-        document.getElementById("breath-trigger").onclick = () => {
-            if (!isMeditating) {
-                startMeditation();
-            } else {
-                // 瞑想中にクリックされたら中止する
-                isMeditating = false;
-                clearInterval(timerInterval);
-                clearTimeout(breathTimeout);
-                document.getElementById("breath-bg").style.transitionDuration = '1s';
-                document.getElementById("breath-bg").style.transform = 'scale(1)';
-                document.getElementById("header-icons").style.opacity = "1";
-                document.getElementById("header-icons").style.pointerEvents = "auto";
-                refreshDisplay();
-            }
+        // --- バグ解消のため、シンプルで確実な onclick 方式に統一 ---
+        document.getElementById("breath-trigger").onclick = () => { 
+            if (!isMeditating) { start(); } else if (!isPaused) { pauseMeditation(); }
         };
 
-        // 設定ボタン
-        document.getElementById("btn-settings").onclick = () => {
-            document.getElementById("modal-settings").classList.add('active');
+        document.getElementById("btn-resume").onclick = resumeMeditation;
+        document.getElementById("btn-stop").onclick = () => location.reload();
+        
+        document.getElementById("btn-sound").onclick = (e) => { 
+            e.stopPropagation(); settings.soundEnabled = !settings.soundEnabled; refresh(); 
         };
-
-        // 情報ボタン
-        document.getElementById("btn-info").onclick = () => {
-            document.getElementById("modal-info").classList.add('active');
+        
+        document.getElementById("btn-info").onclick = (e) => { 
+            e.stopPropagation(); document.getElementById("modal-info").classList.add('active'); 
         };
-
-        // モーダルの閉じるボタン
-        document.querySelectorAll('.close-modal').forEach(button => {
-            button.onclick = () => {
-                document.getElementById("modal-settings").classList.remove('active');
-                document.getElementById("modal-info").classList.remove('active');
+        
+        document.getElementById("btn-settings").onclick = (e) => { 
+            e.stopPropagation(); document.getElementById("modal-settings").classList.add('active'); 
+        };
+        
+        // モーダルの × ボタン
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
             };
         });
 
-        // 振動スイッチの切り替え
-        document.getElementById("toggle-vibrate").onclick = () => {
-            settings.vibrate = !settings.vibrate;
-            applyLanguage(); // 見た目を更新
-            if (settings.vibrate) triggerVibration('step'); // テスト振動
-        };
-
-        // 設定の保存
-        document.getElementById("btn-save-settings").onclick = () => {
-            settings.lang = document.getElementById("input-lang").value;
-            settings.totalMinutes = parseInt(document.getElementById("input-total-time").value) || 2;
-            settings.exhaleTime = parseInt(document.getElementById("input-exhale").value) || 15;
-            settings.inhaleTime = parseInt(document.getElementById("input-inhale").value) || 3;
-            settings.holdTime = parseInt(document.getElementById("input-hold").value) || 2;
-            settings.message = document.getElementById("input-message").value || I18N[getCurrentLanguage()].defaultMsg;
-            
-            refreshDisplay();
-            document.getElementById("modal-settings").classList.remove('active');
-        };
-
-        // 画像のコピーボタン
-        document.getElementById("btn-copy-image").onclick = () => {
-            const t = I18N[getCurrentLanguage()];
-            const canvas = document.getElementById("share-canvas");
-            canvas.toBlob(async (blob) => {
-                try {
-                    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-                    // トースト通知を表示
-                    const toast = document.getElementById("toast");
-                    toast.innerText = t.toastCopyOk;
-                    toast.style.opacity = "1";
-                    setTimeout(() => toast.style.opacity = "0", 3000);
-                } catch (e) {
-                    // コピー失敗時は画像をダウンロードさせる（プレビュー環境対策）
-                    const link = document.createElement('a');
-                    link.download = 'meditation.png';
-                    link.href = document.getElementById("preview-image").src;
-                    link.click();
+        // モーダルの背景クリック
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    if (modal.id === 'modal-pause') { resumeMeditation(); } 
+                    else { modal.classList.remove('active'); }
                 }
+            };
+        });
+        
+        window.adjustValue = function(id, delta) {
+            const input = document.getElementById(id);
+            let val = parseInt(input.value) || 1; val += delta; if(val < 1) val = 1;
+            input.value = val; input.dispatchEvent(new Event('input'));
+        };
+
+        document.querySelectorAll('input').forEach(el => el.oninput = (e) => {
+            const id = e.target.id;
+            if(id === 'input-total-time') settings.totalMinutes = parseInt(e.target.value) || 1;
+            if(id === 'input-exhale') settings.exhaleTime = parseInt(e.target.value) || 1;
+            if(id === 'input-inhale') settings.inhaleTime = parseInt(e.target.value) || 1;
+            if(id === 'input-hold') settings.holdTime = parseInt(e.target.value) || 1;
+            if(id === 'input-message') settings.message = e.target.value;
+            refresh();
+        });
+        
+        document.getElementById("btn-reset").onclick = () => location.reload();
+
+        document.getElementById("btn-copy-img").onclick = () => {
+            const canvas = document.getElementById("share-canvas");
+            canvas.toBlob(b => {
+                try { 
+                    navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]); 
+                    const toast = document.getElementById("toast");
+                    toast.innerText = I18N[getLang()].postOk;
+                    toast.style.opacity = "1";
+                    setTimeout(() => { toast.style.opacity = "0"; }, 3000);
+                } catch(e){}
             });
         };
 
-        // Xに投稿ボタン
         document.getElementById("btn-post-x").onclick = () => {
-            const t = I18N[getCurrentLanguage()];
-            // 投稿する文章を作成。ご要望通り一行にまとめました。
-            const text = `${settings.totalMinutes}${t.xShareText}${window.location.href}`;
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+            const t = I18N[getLang()];
+            const text = `${settings.totalMinutes}${t.xShareText}`;
+            const url = window.location.href;
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
         };
 
-        // 完了して戻るボタン
-        document.getElementById("btn-reset").onclick = () => {
-            document.getElementById("finish-overlay").style.display = 'none';
-            document.getElementById("header-icons").style.opacity = "1";
-            document.getElementById("header-icons").style.pointerEvents = "auto";
-            refreshDisplay();
-        };
-
-        // --- 5. 初期化 ---
-
-        // 画面の表示を最新の状態に更新します
-        function refreshDisplay() {
-            const m = Math.floor(settings.totalMinutes).toString().padStart(2, '0');
-            document.getElementById("timer-display").innerText = `${m}:00`;
-            applyLanguage();
-        }
-
-        // アプリ起動時に一回実行
-        refreshDisplay();
-
+        refresh(); setVisuals('reset', 0);
     </script>
 </body>
 </html>
