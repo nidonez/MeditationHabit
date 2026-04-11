@@ -8,11 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- Firebase Libraries -->
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js" type="module"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js" type="module"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js" type="module"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400&family=Noto+Sans+JP:wght@100;200;300;400&display=swap" rel="stylesheet">
     
     <style>
@@ -317,20 +312,9 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, updateDoc, setDoc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // --- Firebase 初期化 ---
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'meditation-habit-v1';
-
+    <script>
         // --- 1. 基本設定 ---
-        const STORAGE_KEY = "meditation_habit_settings_v9";
+        const STORAGE_KEY = "meditation_habit_settings_v10";
         const DEFAULT_SETTINGS = { totalMinutes: 2, exhaleTime: 15, inhaleTime: 3, holdTime: 2, message: "考えない", soundEnabled: true, lang: "auto" };
         let settings = { ...DEFAULT_SETTINGS };
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -439,44 +423,33 @@
         function start() { isMeditating = true; isPaused = false; document.getElementById("header-icons").style.opacity = "0"; document.getElementById("header-icons").style.pointerEvents = "none"; document.getElementById("hint-text").style.opacity = "0"; remainingSeconds = settings.totalMinutes * 60; setVisuals('reset', 0); document.getElementById('visual-container').offsetHeight; runLoop('exhale'); startTimer(); }
         function pauseMeditation() { isPaused = true; clearInterval(timerInterval); clearTimeout(breathTimeout); if (audioCtx && audioCtx.state === 'running') audioCtx.suspend(); document.getElementById("modal-pause").classList.add('active'); }
         function resumeMeditation() { isPaused = false; document.getElementById("modal-pause").classList.remove('active'); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); startTimer(); runLoop(currentPhaseStr); }
-        async function finalize() { 
-            isMeditating = false; clearInterval(timerInterval); clearTimeout(breathTimeout); 
-            document.getElementById("header-icons").style.opacity = "1"; document.getElementById("header-icons").style.pointerEvents = "auto"; document.getElementById("hint-text").style.opacity = "1";
-            drawResult().then(() => { document.getElementById("finish-overlay").style.display = 'flex'; }); 
-        }
+        async function finalize() { isMeditating = false; clearInterval(timerInterval); clearTimeout(breathTimeout); document.getElementById("header-icons").style.opacity = "1"; document.getElementById("header-icons").style.pointerEvents = "auto"; document.getElementById("hint-text").style.opacity = "1"; drawResult().then(() => { document.getElementById("finish-overlay").style.display = 'flex'; }); }
 
         async function drawResult() { 
             const canvas = document.getElementById("share-canvas"), ctx = canvas.getContext('2d'), hr = new Date().getHours();
             const lang = getCurLang();
             const t = I18N[lang];
-            
             const grads = { morning: ["#e0f2f1", "#80cbc4"], noon: ["#e1f5fe", "#81d4fa"], evening: ["#ffe0b2", "#ffb74d"], night: ["#040b10", "#102027"] };
             let timeKey = 'night';
             if (hr >= 5 && hr < 11) timeKey = 'morning';
             else if (hr >= 11 && hr < 17) timeKey = 'noon';
             else if (hr >= 17 && hr < 21) timeKey = 'evening';
-            
             const [c1, c2] = grads[timeKey], g = ctx.createLinearGradient(0,0,0,630); g.addColorStop(0, c1); g.addColorStop(1, c2);
             ctx.fillStyle = g; ctx.fillRect(0,0,1200,630);
-            
             ctx.save(); ctx.translate(350, 420); 
             ctx.fillStyle = timeKey === 'night' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)';
             ctx.shadowBlur = 40; ctx.shadowColor = timeKey === 'night' ? 'rgba(0, 255, 230, 0.4)' : 'rgba(255,255,255,0.8)';
-            
             function drawPetal(sc, rot) {
                 ctx.save(); ctx.rotate(rot); ctx.scale(sc * 1.4, sc * 1.4); 
                 ctx.beginPath(); ctx.moveTo(0,0); ctx.bezierCurveTo(45,-50,35,-130,0,-180); ctx.bezierCurveTo(-35,-130,-45,-50,0,0); ctx.fill(); ctx.restore();
             }
             drawPetal(0.7, -Math.PI/2.5); drawPetal(0.7, Math.PI/2.5); drawPetal(0.85, -Math.PI/3.5); drawPetal(0.85, Math.PI/3.5); drawPetal(0.95, -Math.PI/6); drawPetal(0.95, Math.PI/6); drawPetal(1.0, 0);
             ctx.beginPath(); ctx.moveTo(0,10); ctx.quadraticCurveTo(120,10,200,-50); ctx.quadraticCurveTo(140,40,0,40); ctx.quadraticCurveTo(-140,40,-200,-50); ctx.quadraticCurveTo(-120,10,0,10); ctx.fill(); ctx.restore();
-            
             ctx.textAlign = 'left'; ctx.fillStyle = timeKey === 'night' ? '#fff' : '#1d1d1f';
             ctx.font = "200 160px 'Montserrat'"; ctx.fillText(String(settings.totalMinutes).padStart(2,'0'), 700, 320);
             ctx.font = "300 24px 'Montserrat'"; ctx.fillText(t.minutesLabel, 715, 380);
-            
             ctx.font = lang === 'en' ? "200 26px 'Montserrat'" : "200 36px 'Noto Sans JP'";
             ctx.fillText(t.shareText, 715, 480, 420); 
-            
             document.getElementById("preview-image").src = canvas.toDataURL(); 
         }
 
@@ -501,26 +474,61 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
         }
 
-        const initApp = async () => {
-            await signInAnonymously(auth);
+        // 初期設定
+        window.onload = () => {
+            refresh();
+            setVisuals('reset', 0);
+            
+            // イベント設定
+            document.getElementById("breath-trigger").onclick = () => { if (!isMeditating) start(); else if (!isPaused) pauseMeditation(); };
+            document.getElementById("btn-resume").onclick = resumeMeditation;
+            document.getElementById("btn-stop").onclick = () => location.reload();
+            document.getElementById("btn-sound").onclick = (e) => { e.stopPropagation(); settings.soundEnabled = !settings.soundEnabled; refresh(); };
+            document.getElementById("btn-info").onclick = (e) => { e.stopPropagation(); document.getElementById("modal-info").classList.add('active'); };
+            document.getElementById("btn-settings").onclick = (e) => { e.stopPropagation(); document.getElementById("modal-settings").classList.add('active'); };
+            document.querySelectorAll('.close-modal').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); });
+            document.querySelectorAll('.modal').forEach(modal => modal.onclick = (e) => { if (e.target === modal) { if (modal.id === 'modal-pause') resumeMeditation(); else modal.classList.remove('active'); } });
+            
+            window.adjustValue = function(id, delta) { 
+                const input = document.getElementById(id); 
+                let val = parseInt(input.value) || 1; 
+                val += delta; 
+                if(val < 1) val = 1; 
+                input.value = val; 
+                input.dispatchEvent(new Event('input')); 
+            };
+            
+            document.querySelectorAll('input').forEach(el => el.oninput = (e) => { 
+                const id = e.target.id; 
+                if(id === 'input-total-time') settings.totalMinutes = parseInt(e.target.value) || 1; 
+                if(id === 'input-exhale') settings.exhaleTime = parseInt(e.target.value) || 1; 
+                if(id === 'input-inhale') settings.inhaleTime = parseInt(e.target.value) || 1; 
+                if(id === 'input-hold') settings.holdTime = parseInt(e.target.value) || 1; 
+                if(id === 'input-message') settings.message = e.target.value; 
+                refresh(); 
+            });
+            
+            document.getElementById("btn-reset").onclick = () => location.reload();
+            document.getElementById("btn-copy-img").onclick = () => { 
+                const canvas = document.getElementById("share-canvas"); 
+                canvas.toBlob(b => { 
+                    try { 
+                        navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]); 
+                        const toast = document.getElementById("toast"); toast.innerText = I18N[getCurLang()].postOk; toast.style.opacity = "1"; 
+                        setTimeout(() => { toast.style.opacity = "0"; }, 3000); 
+                    } catch(e){} 
+                }); 
+            };
+            document.getElementById("btn-post-x").onclick = () => { 
+                const t = I18N[getCurLang()]; 
+                const text = `${settings.totalMinutes}${t.xShareText}`; 
+                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`, '_blank'); 
+            };
+
+            if (window.speechSynthesis) {
+                window.speechSynthesis.onvoiceschanged = () => refresh();
+            }
         };
-        initApp();
-
-        document.getElementById("breath-trigger").onclick = () => { if (!isMeditating) start(); else if (!isPaused) pauseMeditation(); };
-        document.getElementById("btn-resume").onclick = resumeMeditation; document.getElementById("btn-stop").onclick = () => location.reload();
-        document.getElementById("btn-sound").onclick = (e) => { e.stopPropagation(); settings.soundEnabled = !settings.soundEnabled; refresh(); };
-        document.getElementById("btn-info").onclick = (e) => { e.stopPropagation(); document.getElementById("modal-info").classList.add('active'); };
-        document.getElementById("btn-settings").onclick = (e) => { e.stopPropagation(); document.getElementById("modal-settings").classList.add('active'); };
-        document.querySelectorAll('.close-modal').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); });
-        document.querySelectorAll('.modal').forEach(modal => modal.onclick = (e) => { if (e.target === modal) { if (modal.id === 'modal-pause') resumeMeditation(); else modal.classList.remove('active'); } });
-        window.adjustValue = function(id, delta) { const input = document.getElementById(id); let val = parseInt(input.value) || 1; val += delta; if(val < 1) val = 1; input.value = val; input.dispatchEvent(new Event('input')); };
-        document.querySelectorAll('input').forEach(el => el.oninput = (e) => { const id = e.target.id; if(id === 'input-total-time') settings.totalMinutes = parseInt(e.target.value) || 1; if(id === 'input-exhale') settings.exhaleTime = parseInt(e.target.value) || 1; if(id === 'input-inhale') settings.inhaleTime = parseInt(e.target.value) || 1; if(id === 'input-hold') settings.holdTime = parseInt(e.target.value) || 1; if(id === 'input-message') settings.message = e.target.value; refresh(); });
-        document.getElementById("btn-reset").onclick = () => location.reload();
-        document.getElementById("btn-copy-img").onclick = () => { const canvas = document.getElementById("share-canvas"); canvas.toBlob(b => { try { navigator.clipboard.write([new ClipboardItem({ [b.type]: b })]); const toast = document.getElementById("toast"); toast.innerText = I18N[getCurLang()].postOk; toast.style.opacity = "1"; setTimeout(() => { toast.style.opacity = "0"; }, 3000); } catch(e){} }); };
-        document.getElementById("btn-post-x").onclick = () => { const t = I18N[getCurLang()]; const text = `${settings.totalMinutes}${t.xShareText}`; window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`, '_blank'); };
-
-        window.speechSynthesis.onvoiceschanged = () => refresh();
-        refresh(); setVisuals('reset', 0);
     </script>
 </body>
 </html>
