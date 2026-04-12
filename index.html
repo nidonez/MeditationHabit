@@ -12,22 +12,30 @@
     
     <style>
         :root {
-            --app-height: 100dvh;
             --magic-cyan: rgba(0, 255, 230, 0.8);
             --magic-blue: rgba(0, 100, 255, 0.5);
+        }
+
+        /* ブラウザ間の差異とスクロールを完全に防ぐための強力な固定 */
+        html, body {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            -webkit-text-size-adjust: 100%; /* スマホブラウザの勝手な文字拡大を防止 */
+            touch-action: manipulation; /* 意図しないズームを防止 */
         }
 
         body {
             font-family: 'Montserrat', 'Noto Sans JP', sans-serif;
             background: radial-gradient(circle at center, #05131a 0%, #000000 100%);
             color: #ffffff;
-            height: var(--app-height);
             display: flex;
             flex-direction: column;
             user-select: none;
             margin: 0;
-            overflow: hidden; 
-            -webkit-overflow-scrolling: touch;
         }
 
         /* --- 魔法陣アニメーション --- */
@@ -103,6 +111,7 @@
             align-items: flex-start;
             overflow-y: auto;
             padding: 2rem 1rem;
+            -webkit-overflow-scrolling: touch; /* モーダル内はスムーズにスクロールさせる */
         }
         .modal.active { opacity: 1; pointer-events: auto; }
 
@@ -132,6 +141,7 @@
             background: rgba(0, 0, 0, 0.98); backdrop-filter: blur(30px);
             overflow-y: auto; padding: 3rem 1.5rem;
             flex-direction: column; align-items: center; justify-content: flex-start;
+            -webkit-overflow-scrolling: touch;
         }
 
         #preview-image {
@@ -193,8 +203,9 @@
 
     <main class="flex-grow flex flex-col items-center justify-center w-full px-6 relative overflow-visible">
         
+        <!-- PCのサイズ（500px）は維持しつつ、スマホ時の横幅マージンを少し（85vw）確保してはみ出し防止 -->
         <div id="breath-trigger" class="relative flex items-center justify-center cursor-pointer group active:opacity-95 transition-all z-10 touch-manipulation" 
-             style="width: min(90vw, 65vh, 500px); height: min(90vw, 65vh, 500px); flex-shrink: 0; aspect-ratio: 1/1;">
+             style="width: min(85vw, 65vh, 500px); height: min(85vw, 65vh, 500px); flex-shrink: 0; aspect-ratio: 1/1;">
             <div id="visual-container" class="pointer-events-none"></div>
             
             <div class="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none text-center">
@@ -423,7 +434,11 @@
         function start() { isMeditating = true; isPaused = false; document.getElementById("header-icons").style.opacity = "0"; document.getElementById("header-icons").style.pointerEvents = "none"; document.getElementById("hint-text").style.opacity = "0"; remainingSeconds = settings.totalMinutes * 60; setVisuals('reset', 0); document.getElementById('visual-container').offsetHeight; runLoop('exhale'); startTimer(); }
         function pauseMeditation() { isPaused = true; clearInterval(timerInterval); clearTimeout(breathTimeout); if (audioCtx && audioCtx.state === 'running') audioCtx.suspend(); document.getElementById("modal-pause").classList.add('active'); }
         function resumeMeditation() { isPaused = false; document.getElementById("modal-pause").classList.remove('active'); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); startTimer(); runLoop(currentPhaseStr); }
-        async function finalize() { isMeditating = false; clearInterval(timerInterval); clearTimeout(breathTimeout); document.getElementById("header-icons").style.opacity = "1"; document.getElementById("header-icons").style.pointerEvents = "auto"; document.getElementById("hint-text").style.opacity = "1"; drawResult().then(() => { document.getElementById("finish-overlay").style.display = 'flex'; }); }
+        async function finalize() { 
+            isMeditating = false; clearInterval(timerInterval); clearTimeout(breathTimeout); 
+            document.getElementById("header-icons").style.opacity = "1"; document.getElementById("header-icons").style.pointerEvents = "auto"; document.getElementById("hint-text").style.opacity = "1";
+            drawResult().then(() => { document.getElementById("finish-overlay").style.display = 'flex'; }); 
+        }
 
         async function drawResult() { 
             const canvas = document.getElementById("share-canvas"), ctx = canvas.getContext('2d'), hr = new Date().getHours();
@@ -474,12 +489,11 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
         }
 
-        // 初期設定
+        // 初期設定とイベントバインディング
         window.onload = () => {
             refresh();
             setVisuals('reset', 0);
             
-            // イベント設定
             document.getElementById("breath-trigger").onclick = () => { if (!isMeditating) start(); else if (!isPaused) pauseMeditation(); };
             document.getElementById("btn-resume").onclick = resumeMeditation;
             document.getElementById("btn-stop").onclick = () => location.reload();
