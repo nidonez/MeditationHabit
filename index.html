@@ -2,7 +2,6 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <!-- 勝手な縮小(shrink-to-fit=no)を防ぎ、画面いっぱいに表示(viewport-fit=cover) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover">
     <title>瞑想習慣 - Meditation Habit</title>
     
@@ -335,6 +334,32 @@
 
         let isMeditating = false, isPaused = false, currentPhaseStr = '', remainingSeconds = settings.totalMinutes * 60;
         let timerInterval = null, breathTimeout = null;
+        let wakeLock = null; // ★追加: スリープ防止用変数
+
+        // ★追加: スリープを防止する関数
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.log('Wake Lock Error:', err);
+                }
+            }
+        }
+
+        // ★追加: スリープ防止を解除する関数
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release().then(() => { wakeLock = null; });
+            }
+        }
+
+        // ★追加: 別のタブやアプリを開いて戻ってきた時にスリープ防止を再開する
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && isMeditating && !isPaused) {
+                await requestWakeLock();
+            }
+        });
 
         const I18N = {
             ja: {
@@ -433,11 +458,20 @@
 
         function runLoop(phase) { if (!isMeditating || isPaused) return; currentPhaseStr = phase; const t = I18N[getCurLang()]; const txt = document.getElementById("phase-text"); if (phase === 'exhale') { txt.innerText = t.exhale; speak(t.exhaleVoice); setTimeout(() => { if (isMeditating && !isPaused) playBreathSound('exhale', settings.exhaleTime); }, 1500); setVisuals('exhale', settings.exhaleTime); breathTimeout = setTimeout(() => { if (!isPaused) runLoop('inhale'); }, settings.exhaleTime * 1000); } else if (phase === 'inhale') { txt.innerText = t.inhale; speak(t.inhaleVoice); setTimeout(() => { if (isMeditating && !isPaused) playBreathSound('inhale', settings.inhaleTime); }, 1500); setVisuals('inhale', settings.inhaleTime); breathTimeout = setTimeout(() => { if (!isPaused) runLoop('hold'); }, settings.inhaleTime * 1000); } else { txt.innerText = t.hold; speak(t.holdVoice); setVisuals('hold', settings.holdTime); breathTimeout = setTimeout(() => { if (!isPaused) runLoop('exhale'); }, settings.holdTime * 1000); } }
         function startTimer() { timerInterval = setInterval(() => { remainingSeconds--; const m = Math.floor(remainingSeconds/60).toString().padStart(2,'0'), s = (remainingSeconds%60).toString().padStart(2,'0'); document.getElementById("timer-display").innerText = `${m}:${s}`; if (remainingSeconds <= 0) finalize(); }, 1000); }
-        function start() { isMeditating = true; isPaused = false; document.getElementById("header-icons").style.opacity = "0"; document.getElementById("header-icons").style.pointerEvents = "none"; document.getElementById("hint-text").style.opacity = "0"; remainingSeconds = settings.totalMinutes * 60; setVisuals('reset', 0); document.getElementById('visual-container').offsetHeight; runLoop('exhale'); startTimer(); }
-        function pauseMeditation() { isPaused = true; clearInterval(timerInterval); clearTimeout(breathTimeout); if (audioCtx && audioCtx.state === 'running') audioCtx.suspend(); document.getElementById("modal-pause").classList.add('active'); }
-        function resumeMeditation() { isPaused = false; document.getElementById("modal-pause").classList.remove('active'); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); startTimer(); runLoop(currentPhaseStr); }
+        
+        // ★修正: 開始時にスリープ防止を実行
+        function start() { isMeditating = true; isPaused = false; document.getElementById("header-icons").style.opacity = "0"; document.getElementById("header-icons").style.pointerEvents = "none"; document.getElementById("hint-text").style.opacity = "0"; remainingSeconds = settings.totalMinutes * 60; setVisuals('reset', 0); document.getElementById('visual-container').offsetHeight; requestWakeLock(); runLoop('exhale'); startTimer(); }
+        
+        // ★修正: 一時停止時にスリープ防止を解除
+        function pauseMeditation() { isPaused = true; clearInterval(timerInterval); clearTimeout(breathTimeout); if (audioCtx && audioCtx.state === 'running') audioCtx.suspend(); releaseWakeLock(); document.getElementById("modal-pause").classList.add('active'); }
+        
+        // ★修正: 再開時にスリープ防止を再度実行
+        function resumeMeditation() { isPaused = false; document.getElementById("modal-pause").classList.remove('active'); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); requestWakeLock(); startTimer(); runLoop(currentPhaseStr); }
+        
+        // ★修正: 完了時にスリープ防止を解除
         async function finalize() { 
             isMeditating = false; clearInterval(timerInterval); clearTimeout(breathTimeout); 
+            releaseWakeLock();
             document.getElementById("header-icons").style.opacity = "1"; document.getElementById("header-icons").style.pointerEvents = "auto"; document.getElementById("hint-text").style.opacity = "1";
             drawResult().then(() => { document.getElementById("finish-overlay").style.display = 'flex'; }); 
         }
