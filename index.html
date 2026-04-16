@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover">
     <title>瞑想習慣 - Meditation Habit</title>
     
+    <!-- ブラウザのタブに表示されるロゴ（ファビコン）を追加 -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%2305131a%22/><circle cx=%2250%22 cy=%2250%22 r=%2240%22 stroke=%22%2300FFE6%22 stroke-width=%224%22 fill=%22none%22 stroke-dasharray=%2210 5%22/><path d=%22M50 30 C50 30, 65 55, 65 75 C65 85, 50 85, 50 85 C50 85, 35 85, 35 75 C35 55, 50 30, 50 30 Z%22 fill=%22%230064FF%22/></svg>">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
@@ -186,12 +189,24 @@
             text-decoration: none;
         }
 
+        /* 吹き出しの基本スタイル */
         #support-popover {
-            transition: opacity 0.2s;
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateY(10px);
         }
         #support-popover.active {
             opacity: 1;
             pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        /* PCでのホバー表示用 (md以上で有効) */
+        @media (min-width: 768px) {
+            .support-container:hover #support-popover {
+                opacity: 1;
+                pointer-events: auto;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
@@ -211,19 +226,21 @@
             </button>
         </div>
 
-        <!-- 右側：？マーク、支援（OFUSE） -->
-        <div class="flex gap-2 md:gap-3 relative">
-            <button id="btn-support-info" class="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 shadow-sm transition-all cursor-pointer touch-manipulation">
-                <i class="ph ph-question text-xl md:text-2xl text-gray-300 pointer-events-none"></i>
+        <!-- 右側：支援関連 -->
+        <div class="flex gap-2 md:gap-3 relative support-container">
+            <!-- PCでは非表示、スマホ・タブレットでは表示される「？」ボタン -->
+            <button id="btn-support-info" class="w-10 h-10 md:hidden flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 shadow-sm transition-all cursor-pointer touch-manipulation">
+                <i class="ph ph-question text-xl text-gray-300 pointer-events-none"></i>
             </button>
+            
             <a href="https://ofuse.me/4827cba3" target="_blank" rel="noopener noreferrer" class="h-10 md:h-12 px-4 md:px-5 rounded-full flex items-center justify-center gap-1.5 md:gap-2 bg-gradient-to-r from-pink-500 to-rose-400 text-white hover:opacity-90 transition active:scale-95 cursor-pointer shadow-sm touch-manipulation">
                 <i class="ph ph-heart text-lg md:text-xl pointer-events-none"></i>
                 <span class="text-[11px] md:text-sm font-medium" id="label-ofuse-header">支援</span>
             </a>
 
-            <!-- 吹き出しポップオーバー -->
-            <div id="support-popover" class="absolute top-14 md:top-16 right-0 w-[240px] md:w-[280px] bg-[rgba(15,22,28,0.98)] border border-white/10 rounded-2xl p-4 md:p-5 shadow-2xl opacity-0 pointer-events-none transition-opacity duration-200 z-[100] backdrop-blur-md">
-                <div class="absolute -top-2 right-[4.5rem] md:right-[5.5rem] w-4 h-4 bg-[rgba(15,22,28,0.98)] border-t border-l border-white/10 transform rotate-45"></div>
+            <!-- 吹き出しポップオーバー (PCではホバー、スマホでは？ボタンで表示) -->
+            <div id="support-popover" class="absolute top-14 md:top-16 right-0 w-[240px] md:w-[280px] bg-[rgba(15,22,28,0.98)] border border-white/10 rounded-2xl p-4 md:p-5 shadow-2xl opacity-0 pointer-events-none z-[100] backdrop-blur-md">
+                <div class="absolute -top-2 right-4 md:right-8 w-4 h-4 bg-[rgba(15,22,28,0.98)] border-t border-l border-white/10 transform rotate-45"></div>
                 <p class="text-[11px] md:text-xs text-gray-300 leading-relaxed m-0 text-left" id="text-support-desc">
                     アプリをより良くし、活動を続けていくための支援をお願いしています。<br><br>少しでも支援していただけたら、とても嬉しいです！
                 </p>
@@ -510,15 +527,20 @@
             document.getElementById("btn-info").onclick = (e) => { e.stopPropagation(); document.getElementById("modal-info").classList.add('active'); };
             document.getElementById("btn-settings").onclick = (e) => { e.stopPropagation(); document.getElementById("modal-settings").classList.add('active'); };
             
-            document.getElementById("btn-support-info").onclick = (e) => { 
-                e.stopPropagation(); 
-                document.getElementById("support-popover").classList.toggle('active'); 
-            };
+            // スマホ用の「？」ボタンクリック処理
+            const btnSupportInfo = document.getElementById("btn-support-info");
+            if (btnSupportInfo) {
+                btnSupportInfo.onclick = (e) => { 
+                    e.stopPropagation(); 
+                    document.getElementById("support-popover").classList.toggle('active'); 
+                };
+            }
             
+            // 画面外クリックで吹き出しを閉じる (スマホ用)
             document.addEventListener('click', (e) => {
                 const popover = document.getElementById("support-popover");
                 const btn = document.getElementById("btn-support-info");
-                if (popover && popover.classList.contains('active') && !popover.contains(e.target) && !btn.contains(e.target)) {
+                if (popover && popover.classList.contains('active') && !popover.contains(e.target) && (!btn || !btn.contains(e.target))) {
                     popover.classList.remove('active');
                 }
             });
